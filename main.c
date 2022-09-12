@@ -83,7 +83,7 @@ update_player(struct Entity * p)
 	{
 		if (p->dir != dx)
 		{
-			p->turnback_time = 12;
+			p->turnback_time = 10;
 		}
 		p->dir = dx;
 	}
@@ -111,7 +111,7 @@ update_player(struct Entity * p)
 		/* avoid changing frames for jump-state
 		 * because we want to smoothly come out of landing.
 		 * */
-		p->frame_hold = 6;
+		p->frame_hold = 5;
 		++(p->frame);
 		p->frame &= 3;
 	}
