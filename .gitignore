@@ -1,2 +1,4 @@
 obj/
 nonsrc/
+Game.app/
+*.tiled-session

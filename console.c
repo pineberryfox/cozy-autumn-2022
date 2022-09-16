@@ -1,20 +1,23 @@
 #include "console.h"
 #include "framebuffer.h"
 
-int cn_buttons = 0;
+int cn_buttons;
 struct FrameBuffer cn_screen;
 
-static _Bool _fullscreen = 0;
-static Uint64 _prev_time = 0;
-static Uint64 _now = 0;
-static double _time_accumulator = 0;
+static _Bool _fullscreen;
+static Uint64 _prev_time;
+static Uint64 _now;
+static double _time_accumulator;
 static double const _dt = 1.0 / 60.0;
 static double _times[16];
-static int _time_i = 0;
+static int _time_i;
+
+void (*cn_quit_hook)(void) = NULL;
 
 static void
 _quit(int status)
 {
+	if (cn_quit_hook) { cn_quit_hook(); }
 #ifndef __EMSCRIPTEN__
 	SDL_DestroyWindow(cn_screen.win);
 	SDL_Quit();
@@ -92,6 +95,11 @@ cn_update(void)
 			case SDL_SCANCODE_S:
 			case SDL_SCANCODE_DOWN:
 				cn_buttons |= CN_BTN_DOWN;
+				break;
+			case SDL_SCANCODE_F10:
+				_fullscreen = !_fullscreen;
+				SDL_SetWindowFullscreen(cn_screen.win,
+				                        _fullscreen);
 				break;
 			default:
 				break;

@@ -14,6 +14,7 @@ enum CN_Button {
 /* buttons: UDLR-+BA */
 extern int cn_buttons;
 extern struct FrameBuffer cn_screen;
+extern void (*cn_quit_hook)(void);
 void cn_init(char * title);
 void cn_close(void);
 void cn_update(void);
