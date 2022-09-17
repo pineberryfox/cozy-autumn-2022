@@ -20,8 +20,11 @@ struct Entity
 	int frame_hold;
 	int state;
 	int turnback_time;
+	int iframes;
+	int hp;
 };
 static SDL_Texture *fox;
+static SDL_Texture *ui;
 static struct Entity player;
 static int level;
 static int pressed;
@@ -30,16 +33,24 @@ static int ncx;
 static int cx;
 static int cy;
 static int cyt;
+static int frozen;
 
 static void
 init_player(struct Entity * p)
 {
-	p->y = (29 * 16) << 8;
 	p->x = 28 << 8;
+	p->y = (29 * 16) << 8;
+	p->vx = 0;
+	p->vy = 0;
 	p->dir = 1;
 	p->frame = 0;
 	p->frame_hold = 6;
 	p->state = 0;
+	p->turnback_time = 0;
+	p->iframes = 0;
+	p->hp = 10;
+	cx = (player.x >> 8) - 120;
+	cy = cyt = (player.y >> 8) - 48;
 }
 
 static void
@@ -50,8 +61,11 @@ update_player(struct Entity * p)
 	static int const vymax = 8<<8;
 	static int const grav = 58;
 	static int const vy0 = 1248;
+	static int const max_iframes = 60;
+	static int const no_ctrl_time = 20;
 	static int jbuf = 0;
 	static int coyote = 0;
+	int hurt = 0;
 	int dx = !!(cn_buttons & CN_BTN_RIGHT)
 		- !!(cn_buttons & CN_BTN_LEFT);
 	int f;
@@ -62,6 +76,11 @@ update_player(struct Entity * p)
 	if (pressed & CN_BTN_A) { jbuf = 4; }
 	if (--jbuf < 0) { jbuf = 0; }
 	if (--coyote < 0) { coyote = 0; }
+	if (p->iframes > max_iframes - no_ctrl_time)
+	{
+		dx = jbuf = 0;
+	}
+	if (--(p->iframes) < 0) { p->iframes = 0; }
 	if (jbuf && coyote)
 	{
 		p->vy = -vy0;
@@ -87,6 +106,7 @@ update_player(struct Entity * p)
 	f |= flags(tile_at(p->x + (s<<8), p->y + (q<<8)));
 	s = p->dir < 0 ? -20 : 19;
 	f |= flags(tile_at(p->x + (s<<8), p->y + (q<<8)));
+	if (f != -1) { hurt |= f&4; }
 	/* you can always land on solid (1),
 	 * while semisolid (2) requires having previously been
 	 * not within it
@@ -133,6 +153,20 @@ update_player(struct Entity * p)
 	f = 0;
 	f |= flags(tile_at(p->x + (q<<8), p->y));
 	f |= flags(tile_at(p->x + (q<<8), p->y + (7<<8)));
+	if (f != -1) { hurt |= f&4; }
+	if (f&1)
+	{
+		p->x  = (p->x + (q<<8))&~0xfff;
+		p->x -= p->dir < 0 ? 1 - (17<<8) : 1;
+		p->x -= (q<<8);
+		p->vx = 0;
+	}
+	/* check interior horizontal map collisions */
+	q = p->dir < 0 ? -9 : 9;
+	f = 0;
+	f |= flags(tile_at(p->x + (q<<8), p->y));
+	f |= flags(tile_at(p->x + (q<<8), p->y + (7<<8)));
+	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
 		p->x  = (p->x + (q<<8))&~0xfff;
@@ -145,6 +179,8 @@ update_player(struct Entity * p)
 	f = 0;
 	f |= flags(tile_at(p->x + q, p->y));
 	f |= flags(tile_at(p->x + q, p->y + (7<<8)));
+	/* take another bit to know direction */
+	if (f != -1) { hurt |= (f&4)>>1; }
 	if (f&1)
 	{
 		p->x  = (p->x + q)&~0xfff;
@@ -161,13 +197,28 @@ update_player(struct Entity * p)
 		++(p->frame);
 		p->frame &= 3;
 	}
+	if (hurt && !p->iframes)
+	{
+		--(p->hp);
+		p->iframes = max_iframes;
+		p->vx = (!!(hurt&4) - !!(hurt&2)) * (-p->dir) * (2<<8);
+		p->vy = -750;
+		frozen = 6;
+	}
+	/* if sufficiently slow, stop and set state to idle (0) */
 	if (!dx && (abs(p->vx) < 1<<5))
 	{
 		p->vx = 0;
 		if (p->state == 1) { p->state = 0; }
 		p->frame = 0;
 	}
-	/* if sufficiently slow, stop and set state to idle (0) */
+	/* void damage */
+	if (!p->iframes && p->y > (32 * 16)<<8)
+	{
+		--(p->hp);
+		p->iframes = 2;
+		if (p->hp < 0) { p->hp = 0; }
+	}
 }
 
 static void
@@ -179,6 +230,7 @@ draw_player(struct Entity * p)
 		? (abs(p->vy) < 100 ? 1 : (p->vy < 0 ? 0 : 2))
 		: p->frame;
 	int const frame = 32 * 4 * (2 * p->state + i) + 8 * stage;
+	if (p->iframes & 1) { return; }
 	fb_spr(&cn_screen, fox, frame, 7, 3,
 	       (p->x >> 8) - 7 * 4 - cx, (p->y >> 8) - 3 * 4 - cy, flip);
 }
@@ -218,8 +270,8 @@ int
 main(int argc, char **argv)
 {
 	int i;
+	int t;
 	struct FrameBuffer * fb;
-	static char buf[16];
 
 #ifdef __APPLE__
 	find_resources();
@@ -228,14 +280,13 @@ main(int argc, char **argv)
 	cn_init("Cozy Autumn 2022");
 	cn_quit_hook = cleanup;
 	fb = &cn_screen;
+	level = 0;
 
 	init_player(&player);
-	cx = (player.x >> 8) - 120;
-	cy = cyt = (player.y >> 8) - 48;
 
 	fox = load_spritesheet("fox.png");
-	snprintf(buf, 16, "skybox%02d.png", level);
-	load_level(0);
+	ui = load_spritesheet("ui.png");
+	load_level(level);
 	ncx = 0;
 
 	while (1)
@@ -243,16 +294,26 @@ main(int argc, char **argv)
 		/* physics frames */
 		while (cn_need_physics())
 		{
-			update_player(&player);
+			--frozen;
+			if (frozen < 0) { frozen = 0; }
+			if (!frozen)
+			{
+				update_player(&player);
+				if (!player.hp)
+				{
+					init_player(&player);
+				}
+			}
 			pressed = 0;
 			released = 0;
-			if ((player.x >> 8) - cx > 136)
+#define CDIST 4
+			if ((player.x >> 8) - cx > 120 + CDIST)
 			{
-				cx = (player.x >> 8) - 136;
+				cx = (player.x >> 8) - (120 + CDIST);
 			}
-			if ((player.x >>8) - cx < 104)
+			if ((player.x >>8) - cx < 120 - CDIST)
 			{
-				cx = (player.x >> 8) - 104;
+				cx = (player.x >> 8) - (120 - CDIST);
 			}
 			if (player.state != 2)
 			{
@@ -275,27 +336,37 @@ main(int argc, char **argv)
 		cn_update();
 		pressed  |= (cn_buttons ^ i) &  cn_buttons;
 		released |= (cn_buttons ^ i) & ~cn_buttons;
-		i = snprintf(buf, 16, "%d", cn_get_fps());
 		fb_fill(fb, -1);
 		fb_spr(&cn_screen, skybox, 0, 32, 32, -8, -48, 0);
 		map(cx,cy);
-		fb_text(&cn_screen, buf, 240 - 8 * i, 0, -1);
-		i = snprintf(buf, 16, "%d",
-		             flags(tile_at(player.x + (27<<8),player.y)));
-		fb_text(&cn_screen, buf, 120 - 8 * i, 0, -1);
 		draw_player(&player);
-		int x = cn_buttons;
-		int y = pressed;
-		int z = released;
-		for (i = 0; i < 8; ++i)
+		t = player.hp;
+		for(i = 0; i < 5; ++i)
 		{
-			if (x & 1) { fb_pixel(fb,235-i,10,11); }
-			if (y & 1) { fb_pixel(fb,235-i,10,16); }
-			if (z & 1) { fb_pixel(fb,235-i,10,3); }
-			x >>= 1;
-			y >>= 1;
-			z >>= 1;
+			fb_spr(&cn_screen, ui, (t > 2) ? 2 : t, 1, 1,
+			       100 + 8 * i, 4, 0);
+			t -= 2;
+			if (t < 0) { t = 0; }
 		}
+#ifdef DEBUG
+		{
+			static char buf[16];
+			i = snprintf(buf, 16, "%d", cn_get_fps());
+			fb_text(&cn_screen, buf, 240 - 8 * i, 0, -1);
+			int x = cn_buttons;
+			int y = pressed;
+			int z = released;
+			for (i = 0; i < 8; ++i)
+			{
+				if (x & 1) { fb_pixel(fb,235-i,10,11); }
+				if (y & 1) { fb_pixel(fb,235-i,10,16); }
+				if (z & 1) { fb_pixel(fb,235-i,10,3); }
+				x >>= 1;
+				y >>= 1;
+				z >>= 1;
+			}
+		}
+#endif
 		fb_show(&cn_screen);
 	}
 	return 0;
