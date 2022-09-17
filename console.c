@@ -122,12 +122,13 @@ cn_init(char *title)
 	{
 		_times[i] = 0;
 	}
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+#ifdef __APPLE__
+	SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "1");
+#endif
 	SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO
 	         | SDL_INIT_GAMECONTROLLER);
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, 0);
-#ifdef __APPLE__
-	SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, 0);
-#endif
 	SDL_ShowCursor(SDL_DISABLE);
 	if (!title)
 	{
@@ -141,7 +142,6 @@ cn_init(char *title)
 		/* try to add all the controllers on startup! */
 		add_controller(i);
 	}
-	printf("%d\n", _num_pads);
 	cn_update();
 }
 
@@ -216,8 +216,11 @@ cn_update(void)
 				break;
 			case SDL_SCANCODE_F10:
 				_fullscreen = !_fullscreen;
-				SDL_SetWindowFullscreen(cn_screen.win,
-				                        _fullscreen);
+				SDL_SetWindowFullscreen
+					(cn_screen.win,
+					 _fullscreen
+					 ? SDL_WINDOW_FULLSCREEN_DESKTOP
+					 : 0);
 				break;
 			default:
 				break;

@@ -134,5 +134,5 @@ void
 clamp_cam(int *cx, int *cy)
 {
 	*cx = clamp(0, *cx, _map_length * 16 - 240);
-	*cy = clamp(0, *cy, COL_SIZE * 16 - 160);
+	*cy = clamp(0, *cy, (COL_SIZE * 16 - 160) << 8);
 }

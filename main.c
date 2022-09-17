@@ -9,6 +9,11 @@
 #include "levels.h"
 #include "graphics.h"
 
+static int const _shakex[] = {0, 6, 0, -3, 3, -6};
+static int const _shakey[] = {3, 6, 0, -6, -3, 0};
+static int _shake_time;
+#define _shakes (sizeof(_shakex)/sizeof(_shakex[0]))
+
 struct Entity
 {
 	int x;
@@ -32,6 +37,8 @@ static int released;
 static int ncx;
 static int cx;
 static int cy;
+static int rcx;
+static int rcy;
 static int cyt;
 static int frozen;
 static int hx;
@@ -52,7 +59,7 @@ init_player(struct Entity * p)
 	p->iframes = 0;
 	p->hp = 10;
 	cx = (player.x >> 8) - 120;
-	cy = cyt = (player.y >> 8) - 48;
+	cy = cyt = player.y - (48<<8);
 }
 
 static void
@@ -79,7 +86,8 @@ update_player(struct Entity * p)
 	if (pressed & CN_BTN_A) { jbuf = 4; }
 	if (--jbuf < 0) { jbuf = 0; }
 	if (--coyote < 0) { coyote = 0; }
-	if (p->iframes > max_iframes - no_ctrl_time)
+	if (p->iframes > max_iframes - no_ctrl_time
+	    || p->y > ((32 * 16)<<8))
 	{
 		dx = jbuf = 0;
 	}
@@ -233,6 +241,7 @@ update_player(struct Entity * p)
 		p->vx = (!!(hurt&4) - !!(hurt&2)) * (-p->dir) * (2<<8);
 		p->vy = -750;
 		frozen = 6;
+		_shake_time = 12;
 	}
 	/* if sufficiently slow, stop and set state to idle (0) */
 	if (!dx && (abs(p->vx) < 1<<5))
@@ -261,7 +270,8 @@ draw_player(struct Entity * p)
 	int const frame = 32 * 4 * (2 * p->state + i) + 8 * stage;
 	if (p->iframes & 4) { return; }
 	fb_spr(&cn_screen, fox, frame, 7, 3,
-	       (p->x >> 8) - 7 * 4 - cx, (p->y >> 8) - 3 * 4 - cy, flip);
+	       (p->x >> 8) - 7 * 4 - cx,
+	       ((p->y - cy) >> 8) - 3 * 4, flip);
 }
 
 static void
@@ -324,6 +334,8 @@ main(int argc, char **argv)
 		/* physics frames */
 		while (cn_need_physics())
 		{
+			--_shake_time;
+			if (_shake_time < 0) { _shake_time = 0; }
 			--frozen;
 			if (frozen < 0) { frozen = 0; }
 			if (!frozen)
@@ -336,27 +348,36 @@ main(int argc, char **argv)
 			}
 			pressed = 0;
 			released = 0;
-			if ((player.x >> 8) - cx > 120 + _cdist)
+			if ((player.x >> 8) - rcx > 120 + _cdist)
 			{
-				cx = (player.x >> 8) - (120 + _cdist);
+				rcx = (player.x >> 8) - (120 + _cdist);
 			}
 			if ((player.x >>8) - cx < 120 - _cdist)
 			{
-				cx = (player.x >> 8) - (120 - _cdist);
+				rcx = (player.x >> 8) - (120 - _cdist);
 			}
 			if (player.state != 2)
 			{
-				cyt = (player.y >> 8) - 48;
+				cyt = player.y - (54<<8);
 			}
-			if (player.vy > 0 && (player.y>>8) - cy > 96)
+			if (player.vy > 0 && ((player.y - cy)>>8) > 96)
 			{
-				cy = (player.y >> 8) - 96;
+				rcy = player.y - (96 << 8);
 			}
-			cy += !!(cy < cyt) - !!(cy > cyt);
-			clamp_cam(&cx, &cy);
+			static int const _ytrack = 3<<7;
+			if (abs(rcy-cyt) < _ytrack)
+			{
+				rcy = cyt;
+			}
+			else
+			{
+				rcy += _ytrack
+					* (!!(rcy < cyt) - !!(rcy > cyt));
+			}
+			clamp_cam(&rcx, &rcy);
 		}
 		/* actual frames */
-		while (cx > ncx)
+		while (rcx > ncx)
 		{
 			load_column();
 			ncx += 16;
@@ -367,12 +388,19 @@ main(int argc, char **argv)
 		released |= (cn_buttons ^ i) & ~cn_buttons;
 		fb_fill(fb, -1);
 		fb_spr(&cn_screen, skybox, 0, 32, 32, -8, -48, 0);
-		map(cx,cy);
+		cx = rcx + (_shake_time
+		            ? _shakex[(_shake_time-1) % _shakes]
+		            : 0);
+		cy = rcy + ((_shake_time
+		             ? _shakey[(_shake_time-1) % _shakes]
+		             : 0) << 8);
+		clamp_cam(&cx, &cy);
+		map(cx, cy>>8);
 		draw_player(&player);
 		if (frozen)
 		{
 			fb_spr(&cn_screen, ui, 3, 1, 1,
-			       (hx>>8) - cx, (hy>>8) - cy, 0);
+			       (hx>>8) - cx, (hy - cy) >> 8, 0);
 		}
 		t = player.hp;
 		for(i = 0; i < 5; ++i)
