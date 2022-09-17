@@ -34,6 +34,8 @@ static int cx;
 static int cy;
 static int cyt;
 static int frozen;
+static int hx;
+static int hy;
 
 static void
 init_player(struct Entity * p)
@@ -71,6 +73,7 @@ update_player(struct Entity * p)
 	int f;
 	int q;
 	int s;
+	int t;
 	/* default to jumping/falling (2) state */
 	p->state = 2;
 	if (pressed & CN_BTN_A) { jbuf = 4; }
@@ -88,9 +91,15 @@ update_player(struct Entity * p)
 		p->frame = 2;
 		jbuf = coyote = 0;
 	}
+	/*
 	if ((released & CN_BTN_A) && p->vy < -750)
 	{
 		p->vy = -750;
+	}
+	*/
+	if ((released & CN_BTN_A) && p->vy < 0)
+	{
+		p->vy /= 2;
 	}
 	p->vy += grav;
 	if (p->vy > vymax)
@@ -99,13 +108,19 @@ update_player(struct Entity * p)
 	}
 	p->y += p->vy;
 	/* check vertical map-collisions */
-	q = p->vy <= 0 ? 0 : 8;
+	q = p->vy <= 0 ? 0 : (8<<8);
 	f = 0;
-	f |= flags(tile_at(p->x, p->y + (q<<8)));
-	s = p->dir < 0 ? -11 : 10;
-	f |= flags(tile_at(p->x + (s<<8), p->y + (q<<8)));
-	s = p->dir < 0 ? -20 : 19;
-	f |= flags(tile_at(p->x + (s<<8), p->y + (q<<8)));
+	t= flags(tile_at(p->x, p->y + q));
+	if (t != -1 && t&4) { hx = p->x; hy = p->y + q; }
+	f |= t;
+	s = p->dir < 0 ? -(11<<8) : (10<<8);
+	t = flags(tile_at(p->x + s, p->y + q));
+	if (t != -1 && t&4) { hx = p->x + s; hy = p->y + q; }
+	f |= t;
+	s = p->dir < 0 ? -(20<<8) : (19<<8);
+	t = flags(tile_at(p->x + s, p->y + q));
+	if (t != -1 && t&4) { hx = p->x + s; hy = p->y + q; }
+	f |= t;
 	if (f != -1) { hurt |= f&4; }
 	/* you can always land on solid (1),
 	 * while semisolid (2) requires having previously been
@@ -115,9 +130,9 @@ update_player(struct Entity * p)
 	            && ((p->y - p->vy + (8<<8))>>12
 	                < ((p->y + (8<<8))>>12))))
 	{
-		p->y  = (p->y + (q<<8))&~0xfff;
+		p->y  = (p->y + q)&~0xfff;
 		p->y -= p->vy <= 0 ? 1 - (17<<8) : 1;
-		p->y -= (q<<8);
+		p->y -= q;
 		if (p->vy > 0)
 		{
 			coyote = 6;
@@ -149,36 +164,50 @@ update_player(struct Entity * p)
 	}
 	p->x += p->vx;
 	/* check nose-side horizontal map collisions */
-	q = p->dir < 0 ? -23 : 22;
+	q = p->dir < 0 ? -(23<<8) : (22<<8);
 	f = 0;
-	f |= flags(tile_at(p->x + (q<<8), p->y));
-	f |= flags(tile_at(p->x + (q<<8), p->y + (7<<8)));
+	t = flags(tile_at(p->x + q, p->y));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
+	f |= t;
+	/*
+	t = flags(tile_at(p->x + q, p->y + (7<<8)));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
+	f |= t;
+	*/
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
-		p->x  = (p->x + (q<<8))&~0xfff;
+		p->x  = (p->x + q)&~0xfff;
 		p->x -= p->dir < 0 ? 1 - (17<<8) : 1;
-		p->x -= (q<<8);
+		p->x -= q;
 		p->vx = 0;
 	}
 	/* check interior horizontal map collisions */
-	q = p->dir < 0 ? -9 : 9;
+	q = p->dir < 0 ? -(9<<8) : (9<<8);
 	f = 0;
-	f |= flags(tile_at(p->x + (q<<8), p->y));
-	f |= flags(tile_at(p->x + (q<<8), p->y + (7<<8)));
+	t = flags(tile_at(p->x + q, p->y));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
+	f |= t;
+	t = flags(tile_at(p->x + q, p->y + (7<<8)));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
+	f |= t;
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
-		p->x  = (p->x + (q<<8))&~0xfff;
+		p->x  = (p->x + q)&~0xfff;
 		p->x -= p->dir < 0 ? 1 - (17<<8) : 1;
-		p->x -= (q<<8);
+		p->x -= q;
 		p->vx = 0;
 	}
 	/* check butt-side horizontal map collisions */
 	q = p->dir < 0 ? (3<<8) : -(4<<8);
 	f = 0;
-	f |= flags(tile_at(p->x + q, p->y));
-	f |= flags(tile_at(p->x + q, p->y + (7<<8)));
+	t = flags(tile_at(p->x + q, p->y));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
+	f |= t;
+	t = flags(tile_at(p->x + q, p->y + (7<<8)));
+	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
+	f |= t;
 	/* take another bit to know direction */
 	if (f != -1) { hurt |= (f&4)>>1; }
 	if (f&1)
@@ -216,7 +245,7 @@ update_player(struct Entity * p)
 	if (!p->iframes && p->y > (32 * 16)<<8)
 	{
 		--(p->hp);
-		p->iframes = 2;
+		p->iframes = 5 * (10 - p->hp) / 3;
 		if (p->hp < 0) { p->hp = 0; }
 	}
 }
@@ -230,7 +259,7 @@ draw_player(struct Entity * p)
 		? (abs(p->vy) < 100 ? 1 : (p->vy < 0 ? 0 : 2))
 		: p->frame;
 	int const frame = 32 * 4 * (2 * p->state + i) + 8 * stage;
-	if (p->iframes & 1) { return; }
+	if (p->iframes & 4) { return; }
 	fb_spr(&cn_screen, fox, frame, 7, 3,
 	       (p->x >> 8) - 7 * 4 - cx, (p->y >> 8) - 3 * 4 - cy, flip);
 }
@@ -269,6 +298,7 @@ find_resources(void)
 int
 main(int argc, char **argv)
 {
+	static int const _cdist = 4;
 	int i;
 	int t;
 	struct FrameBuffer * fb;
@@ -306,14 +336,13 @@ main(int argc, char **argv)
 			}
 			pressed = 0;
 			released = 0;
-#define CDIST 4
-			if ((player.x >> 8) - cx > 120 + CDIST)
+			if ((player.x >> 8) - cx > 120 + _cdist)
 			{
-				cx = (player.x >> 8) - (120 + CDIST);
+				cx = (player.x >> 8) - (120 + _cdist);
 			}
-			if ((player.x >>8) - cx < 120 - CDIST)
+			if ((player.x >>8) - cx < 120 - _cdist)
 			{
-				cx = (player.x >> 8) - (120 - CDIST);
+				cx = (player.x >> 8) - (120 - _cdist);
 			}
 			if (player.state != 2)
 			{
@@ -340,6 +369,11 @@ main(int argc, char **argv)
 		fb_spr(&cn_screen, skybox, 0, 32, 32, -8, -48, 0);
 		map(cx,cy);
 		draw_player(&player);
+		if (frozen)
+		{
+			fb_spr(&cn_screen, ui, 3, 1, 1,
+			       (hx>>8) - cx, (hy>>8) - cy, 0);
+		}
 		t = player.hp;
 		for(i = 0; i < 5; ++i)
 		{

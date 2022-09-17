@@ -38,6 +38,7 @@ cn_init(char *title)
 #ifdef __APPLE__
 	SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, 0);
 #endif
+	SDL_ShowCursor(SDL_DISABLE);
 	if (!title)
 	{
 		title="GAME";
