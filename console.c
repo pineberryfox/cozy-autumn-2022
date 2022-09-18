@@ -19,18 +19,21 @@ static int _num_pads;
 void (*cn_quit_hook)(void) = NULL;
 
 static void
-add_controller(int id)
+add_controller(int device_id)
 {
 	SDL_GameController *pad;
-	if (SDL_IsGameController(id))
+	int id;
+	if (SDL_IsGameController(device_id))
 	{
 		if (_num_pads >= sizeof(_pads) / sizeof(_pads[0]))
 		{
 			return;
 		}
-		pad = SDL_GameControllerOpen(id);
+		pad = SDL_GameControllerOpen(device_id);
 		if (pad)
 		{
+			id = SDL_JoystickInstanceID(
+				SDL_GameControllerGetJoystick(pad));
 			_pads[_num_pads] = pad;
 			_pad_ids[_num_pads] = id;
 			++_num_pads;
@@ -52,11 +55,8 @@ remove_controller(int id)
 		}
 	}
 	if (!x) { return; }
-	for (; i < sizeof(_pads) / sizeof(_pads[0]) - 1; ++i)
-	{
-		_pads[i] = _pads[i + 1];
-		_pad_ids[i] = _pad_ids[i + 1];
-	}
+	_pads[i] = _pads[_num_pads - 1];
+	_pad_ids[i] = _pad_ids[_num_pads - 1];
 	--_num_pads;
 }
 static int
@@ -140,6 +140,7 @@ cn_init(char *title)
 	for (i = 0; i < sizeof(_pads)/sizeof(_pads[0]); ++i)
 	{
 		/* try to add all the controllers on startup! */
+		if (i >= SDL_NumJoysticks()) { break; }
 		add_controller(i);
 	}
 	cn_update();

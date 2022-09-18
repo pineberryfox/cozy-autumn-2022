@@ -188,8 +188,8 @@ fb_vline(struct FrameBuffer *self, int x, int y, int h, int c)
 void
 fb_fill_rect(struct FrameBuffer *self, int x, int y, int w, int h, int c)
 {
-	_set_color(self, c);
 	SDL_Rect r;
+	_set_color(self, c);
 	r.x = x;
 	r.y = y;
 	r.w = w;
@@ -200,8 +200,8 @@ fb_fill_rect(struct FrameBuffer *self, int x, int y, int w, int h, int c)
 void
 fb_rect(struct FrameBuffer *self, int x, int y, int w, int h, int c)
 {
-	_set_color(self, c);
 	SDL_Rect r;
+	_set_color(self, c);
 	r.x = x;
 	r.y = y;
 	r.w = w;
