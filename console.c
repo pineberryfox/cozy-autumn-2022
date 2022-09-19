@@ -14,7 +14,7 @@ static int _time_i;
 
 static SDL_GameController* _pads[16];
 static int _pad_ids[16];
-static int _num_pads;
+static unsigned int _num_pads;
 
 void (*cn_quit_hook)(void) = NULL;
 
@@ -43,7 +43,7 @@ add_controller(int device_id)
 static void
 remove_controller(int id)
 {
-	int i;
+	unsigned int i;
 	int x = 0;
 	for (i = 0; i < sizeof(_pads) / sizeof(_pads[0]); ++i)
 	{
@@ -117,7 +117,7 @@ _quit(int status)
 void
 cn_init(char *title)
 {
-	int i;
+	unsigned int i;
 	for (i = 0; i < sizeof(_times)/sizeof(_times[0]); ++i)
 	{
 		_times[i] = 0;
@@ -140,7 +140,7 @@ cn_init(char *title)
 	for (i = 0; i < sizeof(_pads)/sizeof(_pads[0]); ++i)
 	{
 		/* try to add all the controllers on startup! */
-		if (i >= SDL_NumJoysticks()) { break; }
+		if (i >= (unsigned int)(SDL_NumJoysticks())) { break; }
 		add_controller(i);
 	}
 	cn_update();
@@ -274,7 +274,7 @@ int
 cn_get_fps(void)
 {
 	double ftimes = 0;
-	int i;
+	unsigned int i;
 	for (i = 0; i < sizeof(_times)/sizeof(_times[0]); ++i)
 	{
 		ftimes += _times[i];

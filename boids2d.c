@@ -5,121 +5,71 @@
 #define SENSE 15.0f
 #define SEPARATION 10.0f
 
-static float const _align_factor     = 1.0f/32.0f;
-static float const _coherence_factor = 1.0f/16.0f;
-static float const _uncollide_factor = 1.0f/8.0f;
-
 static struct B2D_V2 const zero;
 
-static float
-_dir(struct B2D_Boid * b)
+void
+init_flock_defaults(struct B2D_Flock *f)
 {
-	if (!b) { return 0; }
-	return atan2f(b->vel.y, b->vel.x);
+	if (!f) { return; }
+	f->target_mindist = 32.0f;
+	f->target_strength = 7.0f/8.0f;
+	f->align_awareness = 15.0f;
+	f->align_strength = 1.0f/16.0f;
+	f->cohere_awareness = 75.0f;
+	f->cohere_strength = 1.0f/64.0f;
+	f->uncollide_awareness = 10.0f;
+	f->uncollide_strength = 0.875f;
 }
 
 static struct B2D_V2
-localize(struct B2D_V2 o, float theta, struct B2D_V2 p)
+_add(struct B2D_V2 a, struct B2D_V2 b)
 {
-	struct B2D_V2 r;
-	float const x = p.x - o.x;
-	float const y = p.y - o.y;
-	/* complex-multiply (x+iy) by (cos(-theta) + i sin(-theta)) */
-	/* recall: cos(-theta) = cos(theta); sin(-theta) = -sin(theta) */
-	float const c = cosf(theta);
-	float const s = -sinf(theta);
-	r.x = x*c - y*s;
-	r.y = x*s + y*c;
+	struct B2D_V2 r = a;
+	r.x += b.x;
+	r.y += b.y;
 	return r;
 }
 
-static int in_range(struct B2D_V2 a)
+static struct B2D_V2
+_sub(struct B2D_V2 a, struct B2D_V2 b)
 {
-	return (hypotf(a.y, a.x) <= SENSE);
+	struct B2D_V2 r = a;
+	r.x -= b.x;
+	r.y -= b.y;
+	return r;
 }
 
-static void
-align(struct B2D_Flock *f, int b)
+static struct B2D_V2
+_smul(struct B2D_V2 a, float s)
 {
-	struct B2D_V2 c = zero;
-	struct B2D_V2 t;
-	struct B2D_Boid *x;
-	int n = 0;
-	int i;
-	if (!f) { return; } /* this should never happen */
-	x = &(f->boids[b]);
-	if (!x) { return; } /* this should never happen */
-	for (i = 0; i < f->num_boids; ++i)
-	{
-		if (i == b) { continue; }
-		t = localize(x->pos, _dir(x), f->boids[i].pos);
-		if (!in_range(t)) { continue; }
-		c.x += (f->boids[i]).vel.x;
-		c.y += (f->boids[i]).vel.y;
-		++n;
-	}
-	if (!n) { return; }
-	/* average orientation of nearby neighbours */
-	c.x /= n;
-	c.y /= n;
-	x->vel.x += (c.x - x->vel.x) * _align_factor;
-	x->vel.y += (c.y - x->vel.y) * _align_factor;
+	struct B2D_V2 r = a;
+	r.x *= s;
+	r.y *= s;
+	return r;
 }
 
-static void
-cohere(struct B2D_Flock *f, int b)
+static struct B2D_V2
+_sdiv(struct B2D_V2 a, float s)
 {
-	struct B2D_V2 c = zero;
-	struct B2D_V2 t;
-	struct B2D_Boid *x;
-	int n = 0;
-	int i;
-	if (!f) { return; } /* this should never happen */
-	x = &(f->boids[b]);
-	if (!x) { return; } /* this should never happen */
-	for (i = 0; i < f->num_boids; ++i)
-	{
-		if (i == b) { continue; }
-		t = localize(x->pos, _dir(x), f->boids[i].pos);
-		if (!in_range(t)) { continue; }
-		c.x += f->boids[i].pos.x;
-		c.y += f->boids[i].pos.y;
-		++n;
-	}
-	/* always add in the global target */
-	c.x += f->target.x;
-	c.y += f->target.y;
-	++n;
-	/* average position of nearby neighbours and target */
-	c.x /= n;
-	c.y /= n;
-	x->vel.x += (c.x - x->pos.x) * _coherence_factor;
-	x->vel.y += (c.y - x->pos.y) * _coherence_factor;
+	struct B2D_V2 r = a;
+	r.x /= s;
+	r.y /= s;
+	return r;
 }
 
-static void
-uncollide(struct B2D_Flock *f, int b)
+static struct B2D_V2
+_normalize_scale(struct B2D_V2 a, float s)
 {
-	struct B2D_Boid *x;
-	struct B2D_V2 c = zero;
-	struct B2D_V2 t;
-	int i;
-	if (!f) { return; }
-	x = &(f->boids[b]);
-	if (!x) { return; }
-	for (i = 0; i < f->num_boids; ++i)
-	{
-		if (i == b) { continue; }
-		t = localize(x->pos, _dir(x), f->boids[i].pos);
-		if (!in_range(t)) { continue; }
-		if (hypotf(t.y, t.x) < SEPARATION)
-		{
-			c.x += x->pos.x - f->boids[i].pos.x;
-			c.y += x->pos.y - f->boids[i].pos.y;
-		}
-	}
-	x->vel.x += c.x * _uncollide_factor;
-	x->vel.y += c.y * _uncollide_factor;
+	float h = hypotf(a.y, a.x);
+	if (!h) { return a; }
+	if (h < 1) { return _smul(a, s); }
+	return _sdiv(_smul(a, s), h);
+}
+
+static int
+in_range(struct B2D_V2 a, float awareness)
+{
+	return (hypotf(a.y, a.x) <= awareness);
 }
 
 static float
@@ -128,8 +78,7 @@ _speed_limit(struct B2D_Flock *f, struct B2D_Boid *x)
 	struct B2D_V2 v;
 	float d;
 	if (!f || !x) { return 0.0f; }
-	v.x = x->pos.x - f->target.x;
-	v.y = x->pos.y - f->target.y;
+	v = _sub(f->target, x->pos);
 	d = hypotf(v.y, v.x);
 	if (d > 48) { return 8.0f; }
 	if (d > 24) { return 5.0f; }
@@ -140,25 +89,89 @@ static void
 move_boid(struct B2D_Flock *f, int b)
 {
 	struct B2D_Boid *x;
+	struct B2D_V2 t;
+	struct B2D_V2 u;
+	struct B2D_V2 valign = zero;
+	struct B2D_V2 vcohere = zero;
+	struct B2D_V2 vuncollide = zero;
+	int balign = 0;
+	int bcohere = 0;
+	int buncollide = 0;
 	float s;
-	float t;
+	float limit;
+	int i;
 	if (!f) { return; }
 	x = &(f->boids[b]);
 	if (!x) { return; }
-	cohere(f, b);
-	uncollide(f, b);
-	align(f, b);
-	s = hypotf(x->vel.y, x->vel.x);
-	t = _speed_limit(f,x);
-	if (s > t)
+	for (i = 0; i < f->num_boids; ++i)
 	{
-		x->vel.x /= s;
-		x->vel.y /= s;
-		x->vel.x *= t;
-		x->vel.y *= t;
+		if (i == b) { continue; }
+		t = _sub(f->boids[i].pos, x->pos);
+		s = hypotf(t.y, t.x);
+		if (s < f->align_awareness)
+		{
+			++balign;
+			valign = _add(valign, f->boids[i].vel);
+		}
+		if (s < f->cohere_awareness)
+		{
+			++bcohere;
+			vcohere = _add(vcohere, t);
+		}
+		if (s < f->uncollide_awareness)
+		{
+			++buncollide;
+			t = _sub(x->pos, f->boids[i].pos);
+			u = _sdiv(t,
+			          powf(1.0f - s/(f->uncollide_awareness),
+			               2.0f));
+			vuncollide = _add(vuncollide, u);
+		}
 	}
-	x->pos.x += x->vel.x;
-	x->pos.y += x->vel.y;
+	/* follow */
+	t = _sub(f->target, x->pos);
+	if (!in_range(t, f->target_mindist))
+	{
+		t = _normalize_scale(_sub(t, x->vel),
+		                     in_range(t,  2 * f->target_mindist)
+		                     ? f->target_strength
+		                     : f->target_strength);
+		x->vel = _add(x->vel, t);
+	}
+	/* cohere */
+	if (bcohere)
+	{
+		vcohere = _sdiv(vcohere, bcohere);
+		vcohere = _sub(vcohere, x->pos);
+		t = _normalize_scale(_sub(vcohere, x->vel),
+		                     f->cohere_strength);
+		x->vel = _add(x->vel, t);
+	}
+	/* align */
+	if (balign)
+	{
+		valign = _sdiv(valign, balign);
+		t = _normalize_scale(_sub(valign, x->vel),
+		                     f->align_strength);
+		x->vel = _add(x->vel, t);
+	}
+	/* uncollide */
+	if (buncollide)
+	{
+		vuncollide = _sdiv(vuncollide, buncollide);
+		t = _normalize_scale(_sub(vuncollide, x->vel),
+		                     f->uncollide_strength);
+		x->vel = _add(x->vel, t);
+	}
+
+	s = hypotf(x->vel.y, x->vel.x);
+	limit = _speed_limit(f,x);
+	if (s > limit)
+	{
+		x->vel = _sdiv(x->vel, s);
+		x->vel = _smul(x->vel, limit);
+	}
+	x->pos = _add(x->pos, x->vel);
 }
 
 void

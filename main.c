@@ -74,6 +74,7 @@ init_flock(void)
 {
 	int i;
 	float d;
+	init_flock_defaults(&hp_flock);
 	hp_flock.num_boids = (player.hp - 1) / 3;
 	hp_flock.target.x = player.x / 256.0f;
 	hp_flock.target.y = (player.y - (16<<8)) / 256.0f;
@@ -260,16 +261,6 @@ main(void)
 			fb_spr(&cn_screen, ui, 3, 1, 1,
 			       (hx>>8) - cx, (hy - cy) >> 8, 0);
 		}
-		/*
-		t = player.hp;
-		for(i = 0; i < 5; ++i)
-		{
-			fb_spr(&cn_screen, ui, (t > 2) ? 2 : t, 1, 1,
-			       100 + 8 * i, 4, 0);
-			t -= 2;
-			if (t < 0) { t = 0; }
-		}
-		*/
 #ifdef DEBUG
 		{
 			static char buf[16];
