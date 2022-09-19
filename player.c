@@ -34,6 +34,15 @@ init_player(struct Entity * p)
 	cy = player.y - (48<<8);
 }
 
+static int
+_handle_map(int x, int y)
+{
+	int t = flags(tile_at(x,y));
+	if (t != -1 && t&4) { hx = x; hy = y; }
+	if (t != -1 && t&8) { collect(x, y); }
+	return t;
+}
+
 void
 update_player(struct Entity * p)
 {
@@ -52,7 +61,6 @@ update_player(struct Entity * p)
 	int f;
 	int q;
 	int s;
-	int t;
 	/* default to jumping/falling (2) state */
 	p->state = 2;
 	if (pressed & CN_BTN_A) { jbuf = 4; }
@@ -84,17 +92,11 @@ update_player(struct Entity * p)
 	/* check vertical map-collisions */
 	q = p->vy <= 0 ? 0 : (8<<8);
 	f = 0;
-	t= flags(tile_at(p->x, p->y + q));
-	if (t != -1 && t&4) { hx = p->x; hy = p->y + q; }
-	f |= t;
+	f |= _handle_map(p->x, p->y + q);
 	s = p->dir < 0 ? -(11<<8) : (10<<8);
-	t = flags(tile_at(p->x + s, p->y + q));
-	if (t != -1 && t&4) { hx = p->x + s; hy = p->y + q; }
-	f |= t;
+	f |= _handle_map(p->x + s, p->y + q);
 	s = p->dir < 0 ? -(20<<8) : (19<<8);
-	t = flags(tile_at(p->x + s, p->y + q));
-	if (t != -1 && t&4) { hx = p->x + s; hy = p->y + q; }
-	f |= t;
+	f |= _handle_map(p->x + s, p->y + q);
 	if (f != -1) { hurt |= f&4; }
 	/* you can always land on solid (1),
 	 * while semisolid (2) requires having previously been
@@ -140,14 +142,7 @@ update_player(struct Entity * p)
 	/* check nose-side horizontal map collisions */
 	q = p->dir < 0 ? -(23<<8) : (22<<8);
 	f = 0;
-	t = flags(tile_at(p->x + q, p->y));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
-	f |= t;
-	/*
-	t = flags(tile_at(p->x + q, p->y + (7<<8)));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
-	f |= t;
-	*/
+	f |= _handle_map(p->x + q, p->y);
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
@@ -159,12 +154,8 @@ update_player(struct Entity * p)
 	/* check interior horizontal map collisions */
 	q = p->dir < 0 ? -(9<<8) : (9<<8);
 	f = 0;
-	t = flags(tile_at(p->x + q, p->y));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
-	f |= t;
-	t = flags(tile_at(p->x + q, p->y + (7<<8)));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
-	f |= t;
+	f |= _handle_map(p->x + q, p->y);
+	f |= _handle_map(p->x + q, p->y + (7<<8));
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
@@ -176,12 +167,8 @@ update_player(struct Entity * p)
 	/* check butt-side horizontal map collisions */
 	q = p->dir < 0 ? (3<<8) : -(4<<8);
 	f = 0;
-	t = flags(tile_at(p->x + q, p->y));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y; }
-	f |= t;
-	t = flags(tile_at(p->x + q, p->y + (7<<8)));
-	if (t != -1 && t&4) { hx = p->x + q; hy = p->y + (7<<8); }
-	f |= t;
+	f |= _handle_map(p->x + q, p->y);
+	f |= _handle_map(p->x + q, p->y + (7<<8));
 	/* take another bit to know direction */
 	if (f != -1) { hurt |= (f&4)>>1; }
 	if (f&1)

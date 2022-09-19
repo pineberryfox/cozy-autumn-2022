@@ -21,4 +21,7 @@ int flags(int);
 /* tile_at: x XX.8, y XX.8 */
 int tile_at(int, int);
 
+/* if the tile has a thingy, take it! */
+void collect(int x, int y);
+
 #endif

@@ -17,13 +17,15 @@ static unsigned char const _flags00[] = {
 	2, 2, 2, 2, 1, 1, 1, 1,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 2, 2, 2, 2, 2, 2,
-	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 8, 0, 0, 0, 0, 0, 0,
 };
 
 static unsigned char const *_flagp;
 static unsigned char const *_levelp;
 static int _map_height_octets;
-static int _map_column;
+static unsigned int _map_column;
+/* static unsigned int _collectibles; */
+static unsigned int _num_collectibles;
 static unsigned char _map[MAP_SIZE];
 static unsigned char const * const _levels[] = {
 	lv00,
@@ -40,7 +42,10 @@ load_level(int n)
 {
 	char buf[16];
 	int i;
-	if (n >= sizeof(_levels)/sizeof(_levels[0])) { return 0; }
+	if ((unsigned int)(n) >= sizeof(_levels)/sizeof(_levels[0]))
+	{
+		return 0;
+	}
 
 	snprintf(buf, 16, "skybox%02d.png", n);
 	skybox = load_spritesheet(buf);
@@ -75,6 +80,10 @@ load_column(void)
 	for (i = 0; i < COL_SIZE; ++i)
 	{
 		x = (m & 1) ? *(_levelp++) : 0;
+		if (flags(x) != -1 && (flags(x) & 8))
+		{
+			++_num_collectibles;
+		}
 		_map[COL_SIZE * _map_column + i] = x;
 		m >>= 1;
 	}
@@ -120,6 +129,17 @@ map(int cx, int cy)
 			       (16 * j) - (cy & 15), 0);
 		}
 	}
+}
+
+void
+collect(int x, int y)
+{
+	int const r = y >> 12;
+	int const c = x >> 12;
+	unsigned int m = COL_SIZE * c + r;
+	if (!(flags(_map[m]) & 8)) { return; }
+	--_num_collectibles;
+	--(_map[COL_SIZE * c + r]);
 }
 
 static int

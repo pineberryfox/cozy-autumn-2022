@@ -115,6 +115,11 @@ draw_flock(void)
 		             3,3,
 		             (0 <= d && d < 2) ? _colours[d] : 0);
 		fb_fill_rect(&cn_screen,
+		             (int)lroundf(p.x) - cx - 1,
+		             (int)(lroundf(p.y - cy/256.0f) - 1),
+		             3,3,
+		             (0 <= d && d < 2) ? _colours[d] : 0);
+		fb_fill_rect(&cn_screen,
 		             (int)lroundf(p.x + v.x) - cx,
 		             (int)(lroundf(p.y + v.y - cy/256.0f)),
 		             3,3,

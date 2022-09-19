@@ -267,7 +267,7 @@ _set_color(struct FrameBuffer *self, int c)
 	int r = 0;
 	int g = 0;
 	int b = 0;
-	if (0 <= c && c < sizeof(_red)/sizeof(_red[0]))
+	if (0 <= c && (unsigned int)(c) < sizeof(_red)/sizeof(_red[0]))
 	{
 		r = _red[c];
 		g = _green[c];
