@@ -106,12 +106,10 @@ axis_map(SDL_GameControllerAxis a, int pos)
 static void
 _quit(int status)
 {
-#ifndef __EMSCRIPTEN__
 	if (cn_quit_hook) { cn_quit_hook(); }
 	SDL_DestroyWindow(cn_screen.win);
 	SDL_Quit();
 	exit(status);
-#endif
 }
 
 void
@@ -129,7 +127,9 @@ cn_init(char *title)
 #endif
 	SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO
 	         | SDL_INIT_GAMECONTROLLER);
+#ifndef __EMSCRIPTEN__
 	SDL_ShowCursor(SDL_DISABLE);
+#endif
 	if (!title)
 	{
 		title="GAME";
@@ -190,9 +190,11 @@ cn_update(void)
 		case SDL_KEYDOWN:
 			switch (e.key.keysym.scancode)
 			{
+#ifndef __EMSCRIPTEN__
 			case SDL_SCANCODE_ESCAPE:
 				_quit(0);
 				break;
+#endif
 			case SDL_SCANCODE_SPACE:
 				cn_buttons |= CN_BTN_A;
 				break;
