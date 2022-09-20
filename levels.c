@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include "common.h"
 #include "console.h"
 #include "framebuffer.h"
 #include "graphics.h"
 #include "levels.h"
+#include "player.h"
 
 #define COL_SIZE (MAX_SCREENS_HIGH * MAP_SCREEN_HEIGHT)
 #define MAP_SIZE (MAX_MAP_WIDTH * COL_SIZE)
@@ -26,6 +28,8 @@ static int _map_height_octets;
 static unsigned int _map_column;
 /* static unsigned int _collectibles; */
 static unsigned int _num_collectibles;
+static unsigned int _player_base_x;
+static unsigned int _player_base_y;
 static unsigned char _map[MAP_SIZE];
 static unsigned char const * const _levels[] = {
 	lv00,
@@ -61,8 +65,15 @@ load_level(int n)
 	{
 		load_column();
 	}
-
+	reset_level();
 	return 1;
+}
+void
+reset_level(void)
+{
+	init_player(&player,
+	            (_player_base_x * 16 + 8)<<8,
+	            (_player_base_y * 16 + 8)<<8);
 }
 
 void
@@ -84,6 +95,16 @@ load_column(void)
 		{
 			++_num_collectibles;
 		}
+		switch (x)
+		{
+		case 64:
+			_player_base_x = _map_column;
+			_player_base_y = i;
+			break;
+		default:
+			break;
+		}
+		if (x >= 64) { x = 0; }
 		_map[COL_SIZE * _map_column + i] = x;
 		m >>= 1;
 	}

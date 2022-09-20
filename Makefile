@@ -28,8 +28,8 @@ boids2d.o : boids2d.c boids2d.h
 console.o : console.c console.h framebuffer.h
 framebuffer.o : framebuffer.c framebuffer.h
 graphics.o : graphics.c console.h graphics.h
-levels.o : levels.c levels.h
+levels.o : levels.c common.h levels.h
 lv00.o : lv00.c
-main.o : main.c boids2d.h console.h entity.h framebuffer.h
+main.o : main.c boids2d.h common.h console.h entity.h framebuffer.h
 main.o : graphics.h levels.h player.h
 player.o : player.c entity.h player.h

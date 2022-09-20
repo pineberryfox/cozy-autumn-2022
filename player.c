@@ -1,26 +1,19 @@
 #include <stdlib.h>
 
+#include "common.h"
 #include "console.h"
 #include "entity.h"
 #include "levels.h"
 
 #include "player.h"
 
-extern int cx;
-extern int cy;
-extern SDL_Texture* fox;
-extern int frozen;
-extern int hx;
-extern int hy;
-extern int pressed;
-extern int released;
-extern int shake_time;
+struct Entity player;
 
 void
-init_player(struct Entity * p)
+init_player(struct Entity * p, int x, int y)
 {
-	p->x = 28 << 8;
-	p->y = (29 * 16) << 8;
+	p->x = x;
+	p->y = y;
 	p->vx = 0;
 	p->vy = 0;
 	p->dir = 1;

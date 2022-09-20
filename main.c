@@ -149,14 +149,14 @@ main(void)
 	fb = &cn_screen;
 	level = 0;
 
-	init_player(&player);
-	init_flock();
-	cyt = cy;
-
 	fox = load_spritesheet("fox.png");
 	ui = load_spritesheet("ui.png");
 	load_level(level);
+	rcy = cy;
+	rcx = cx;
 	ncx = 0;
+	init_flock();
+	cyt = cy;
 
 	while (1)
 	{
@@ -185,7 +185,9 @@ main(void)
 				update_flock(&hp_flock);
 				if (!player.hp)
 				{
-					init_player(&player);
+					reset_level();
+					rcx = cx;
+					rcy = cy;
 					init_flock();
 				}
 			}
