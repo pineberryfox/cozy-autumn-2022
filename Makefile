@@ -1,27 +1,42 @@
-.MAIN : main
-.SUFFIXES : .c .o .tmx
-
-PATH := $(.CURDIR)/Tools:$(PATH)
-.export-env PATH
-
+EXE=
+CFLAGS+= -I$(.CURDIR)/stb
+.ifndef(OS)
+CC=emcc
+CFLAGS+= -O2 -s USE_SDL=2
+LDFLAGS+= --preload-file $(.CURDIR)/assets@
+LDFLAGS+= --shell-file $(.CURDIR)/emcc-template.html
+EXE=.html
+.elif $(OS) == Darwin
+CFLAGS+= -Oz
 CFLAGS+= -DSTBI_ONLY_PNG
 CFLAGS+= -DSTBI_MAX_DIMENSIONS=512
 CFLAGS+= -I/Library/Frameworks/SDL2.framework/Headers
-CFLAGS+= -I$(.CURDIR)/stb
 CFLAGS+= -mmacosx-version-min=10.7 -arch arm64
 CFLAGS+= -Wall
 LDFLAGS+= -F/Library/Frameworks
 LDLIBS+= -framework SDL2
 LDLIBS+= -framework Cocoa
+.endif
+
+.MAIN : main$(EXE)
+.SUFFIXES : .c .o .tmx
+
+PATH := $(.CURDIR)/Tools:$(PATH)
+.export-env PATH
 
 .tmx.c:
 	xpath -q -e '//layer[@name="Layout"]/data/text()' < "$(.IMPSRC)" \
 	| extract-layout.awk \
 	| bin2c "$(.TARGET:T:R)" > "$(.TARGET)"
+.c.o:
+	$(CC) $(CFLAGS) -o $(.TARGET) -c $(.IMPSRC)
 
-main : main.o boids2d.o console.o framebuffer.o graphics.o
-main : levels.o lv00.o player.o
-main :
+main$(EXE) : main.o boids2d.o console.o framebuffer.o graphics.o
+main$(EXE) : levels.o lv00.o player.o
+.if $(CC) == emcc
+main$(EXE) : emcc-template.html
+.endif
+main$(EXE) :
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(.TARGET) $(.ALLSRC:M*.o) $(LDLIBS)
 
 boids2d.o : boids2d.c boids2d.h

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Emscripten-Generated Code</title>
+<style>
+*{margin:0;padding:0;}
+body{background-color:#FFFFE1;color:#533A44;}
+.emscripten{padding-right:0;margin-left:auto;margin-right:auto;display:block;}
+textarea.emscripten{font-family:monospace;width:80%;}
+div.emscripten_border{padding:16px;}
+canvas.emscripten{border:0px none;background-color:#000;}
+</style>
+</head>
+<body>
+<div class="emscripten_border">
+<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+</div>
+<div class="fps">FPS:&nbsp;<span id="fps"></span></div>
+<script type='text/javascript'>
+var Module={canvas:(function(){return document.getElementById('canvas');})()};
+var fps_counter = document.getElementById('fps');
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

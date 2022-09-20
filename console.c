@@ -106,8 +106,8 @@ axis_map(SDL_GameControllerAxis a, int pos)
 static void
 _quit(int status)
 {
-	if (cn_quit_hook) { cn_quit_hook(); }
 #ifndef __EMSCRIPTEN__
+	if (cn_quit_hook) { cn_quit_hook(); }
 	SDL_DestroyWindow(cn_screen.win);
 	SDL_Quit();
 	exit(status);

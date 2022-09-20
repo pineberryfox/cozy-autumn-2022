@@ -241,8 +241,13 @@ fb_spr(struct FrameBuffer * restrict self, SDL_Texture * restrict tex,
 	SDL_RendererFlip flip =
 		((flippage & FB_FLIP_VERT) ? SDL_FLIP_VERTICAL : 0)
 		| ((flippage & FB_FLIP_HORZ) ? SDL_FLIP_HORIZONTAL : 0);
-	SDL_QueryTexture(tex, NULL, NULL, &texw, NULL);
+	if (!self || !tex) { return; }
+	if (SDL_QueryTexture(tex, NULL, NULL, &texw, NULL) < 0)
+	{
+		return;
+	}
 	npr = texw / TILE_SIZE;
+	if (!npr) { return; }
 	source.y = (n / npr) * TILE_SIZE;
 	source.x = (n % npr) * TILE_SIZE;
 	source.w = TILE_SIZE * w;
