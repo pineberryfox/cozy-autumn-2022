@@ -277,8 +277,8 @@ _set_color(struct FrameBuffer *self, int c)
 		r = _red[c];
 		g = _green[c];
 		b = _blue[c];
+		SDL_SetRenderDrawColor(self->_renderer, r, g, b, 255);
 	}
-	SDL_SetRenderDrawColor(self->_renderer, r, g, b, 255);
 }
 
 static void

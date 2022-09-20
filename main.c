@@ -34,12 +34,14 @@ int shake_time;
 /* nonexported */
 static struct FrameBuffer *fb;
 static struct B2D_Flock hp_flock;
+static SDL_Texture *logo;
 static SDL_Texture *ui;
 static int level;
 static int ncx;
 static int rcx;
 static int rcy;
 static int cyt;
+static int _gamestate;
 static int _paused;
 
 static void
@@ -139,7 +141,6 @@ static void
 main_update(void)
 {
 	static int const _cdist = 4;
-	int i;
 	hp_flock.target.x = player.x
 		+ (player.dir > 0 ? -(16<<8) : 16<<8);
 	hp_flock.target.x /= 256.0f;
@@ -207,10 +208,6 @@ main_update(void)
 		load_column();
 		ncx += 16;
 	}
-	i = cn_buttons;
-	cn_update();
-	pressed  |= (cn_buttons ^ i) &  cn_buttons;
-	released |= (cn_buttons ^ i) & ~cn_buttons;
 }
 
 static void
@@ -218,7 +215,6 @@ main_draw(void)
 {
 	int i;
 	int t;
-	fb_fill(fb, -1);
 	fb_spr(&cn_screen, skybox, 0, 32, 32, -8, -48, 0);
 	cx = rcx + (shake_time
 	            ? _shakex[(shake_time-1) % _shakes]
@@ -259,7 +255,7 @@ main_draw(void)
 	{
 		static char buf[16];
 		i = snprintf(buf, 16, "%d", cn_get_fps());
-		fb_text(&cn_screen, buf, 240 - 8 * i, 0, -1);
+		fb_text(&cn_screen, buf, 240 - 8 * i, 0, 19);
 		int x = cn_buttons;
 		int y = pressed;
 		int z = released;
@@ -279,14 +275,44 @@ main_draw(void)
 		fb_text(&cn_screen, "PAUSED", 96, 77, 19);
 		fb_text(&cn_screen, "PAUSED", 96, 76, 0);
 	}
-	fb_show(&cn_screen);
 }
 
 static void
 step(void)
 {
-	main_update();
-	main_draw();
+	static int _logo_time = 120;
+	int i = cn_buttons;
+	cn_update();
+	pressed  |= (cn_buttons ^ i) &  cn_buttons;
+	released |= (cn_buttons ^ i) & ~cn_buttons;
+
+	SDL_SetRenderDrawColor(fb->_renderer, 0, 0, 0, 255);
+	fb_fill(fb, -1);
+	switch (_gamestate)
+	{
+	case 0:
+		while (cn_need_physics()) { --_logo_time; }
+		SDL_SetRenderDrawColor(fb->_renderer, 0, 47, 88, 255);
+		fb_fill(fb, -1);
+		SDL_SetRenderDrawColor(fb->_renderer, 243, 111, 188, 255);
+		fb_spr(&cn_screen, logo, 0, 8, 8, 88, 40, 0);
+		fb_text(&cn_screen, "PINEBERRY", 80, 88, -1);
+		fb_text(&cn_screen, "FOX", 104, 96, -1);
+		if (!_logo_time)
+		{
+			SDL_DestroyTexture(logo);
+			logo = NULL;
+			_gamestate = 1;
+		}
+		pressed = 0;
+		released = 0;
+		break;
+	default:
+		main_update();
+		main_draw();
+		break;
+	}
+	fb_show(&cn_screen);
 #ifdef __EMSCRIPTEN__
 	EM_ASM({fps_counter.innerText = $0;}, cn_get_fps());
 #endif
@@ -305,6 +331,7 @@ main(void)
 	level = 0;
 
 	fox = load_spritesheet("fox.png");
+	logo = load_spritesheet("logo.png");
 	ui = load_spritesheet("ui.png");
 	load_level(level);
 	rcy = cy;

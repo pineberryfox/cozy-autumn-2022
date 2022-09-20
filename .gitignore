@@ -1,4 +1,5 @@
 obj/
 nonsrc/
+web/
 Game.app/
 *.tiled-session

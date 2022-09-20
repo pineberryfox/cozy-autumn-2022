@@ -1,6 +1,7 @@
 EXE=
 CFLAGS+= -I$(.CURDIR)/stb
 .ifndef(OS)
+.OBJDIR : $(.CURDIR)/web
 CC=emcc
 CFLAGS+= -O2 -s USE_SDL=2
 LDFLAGS+= --preload-file $(.CURDIR)/assets@
@@ -11,7 +12,7 @@ CFLAGS+= -Oz
 CFLAGS+= -DSTBI_ONLY_PNG
 CFLAGS+= -DSTBI_MAX_DIMENSIONS=512
 CFLAGS+= -I/Library/Frameworks/SDL2.framework/Headers
-CFLAGS+= -mmacosx-version-min=10.7 -arch arm64
+CFLAGS+= -mmacosx-version-min=10.7 -arch arm64 -arch x86_64
 CFLAGS+= -Wall
 LDFLAGS+= -F/Library/Frameworks
 LDLIBS+= -framework SDL2
@@ -26,8 +27,7 @@ PATH := $(.CURDIR)/Tools:$(PATH)
 
 .tmx.c:
 	xpath -q -e '//layer[@name="Layout"]/data/text()' < "$(.IMPSRC)" \
-	| extract-layout.awk \
-	| bin2c "$(.TARGET:T:R)" > "$(.TARGET)"
+	| extract-layout.awk "$(.TARGET:T:R)" > "$(.TARGET)"
 .c.o:
 	$(CC) $(CFLAGS) -o $(.TARGET) -c $(.IMPSRC)
 
@@ -48,3 +48,8 @@ lv00.o : lv00.c
 main.o : main.c boids2d.h common.h console.h entity.h framebuffer.h
 main.o : graphics.h levels.h player.h
 player.o : player.c entity.h player.h
+
+web.zip : index.html
+	zip -9XDj $(.TARGET) index.html main.data main.js main.wasm
+index.html : main.html
+	cp $(.ALLSRC) $(.TARGET)
