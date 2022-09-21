@@ -10,36 +10,39 @@
 #endif
 
 #include "boids2d.h"
+#include "common.h"
 #include "console.h"
 #include "graphics.h"
 #include "levels.h"
 #include "player.h"
 
 /* constants */
-static int const _shakex[] = {0, 6, 0, -3, 3, -6};
-static int const _shakey[] = {3, 6, 0, -6, -3, 0};
+static int const _shakex[] = {0, 2, 0, -1, 1, -2};
+static int const _shakey[] = {1, 2, 0, -2, -1, 0};
 #define _shakes (sizeof(_shakex)/sizeof(_shakex[0]))
 
 /* exported */
-int cx;
-int cy;
+struct Entity enemies[16];
+struct V2I cam;
+struct V2I screen_lock;
+unsigned int num_enemies;
+SDL_Texture *enemytex;
 SDL_Texture *fox;
+SDL_Texture *ui;
 int frozen;
-int hx;
-int hy;
+int screen_locked;
 int pressed;
 int released;
+int shake_size;
 int shake_time;
 
 /* nonexported */
 static struct FrameBuffer *fb;
 static struct B2D_Flock hp_flock;
 static SDL_Texture *logo;
-static SDL_Texture *ui;
 static int level;
 static int ncx;
-static int rcx;
-static int rcy;
+static struct V2I rcam;
 static int cyt;
 static int _gamestate;
 static int _paused;
@@ -78,12 +81,12 @@ find_resources(void)
 static void
 init_flock(void)
 {
-	int i;
+	unsigned int i;
 	float d;
 	init_flock_defaults(&hp_flock);
 	hp_flock.num_boids = (player.hp - 1) / 3;
-	hp_flock.target.x = player.x / 256.0f;
-	hp_flock.target.y = (player.y - (16<<8)) / 256.0f;
+	hp_flock.target.x = player.pos.x / 256.0f;
+	hp_flock.target.y = (player.pos.y - (16<<8)) / 256.0f;
 	for (i = 0; i < hp_flock.num_boids; ++i)
 	{
 		d = i * 2*M_PI / hp_flock.num_boids;
@@ -102,7 +105,7 @@ draw_flock(void)
 	struct B2D_V2 p;
 	struct B2D_V2 v;
 	float s;
-	int i;
+	unsigned int i;
 	int d;
 	for (i = 0; i < hp_flock.num_boids; ++i)
 	{
@@ -116,35 +119,91 @@ draw_flock(void)
 			v.y /= s;
 		}
 		fb_fill_rect(&cn_screen,
-		             (int)lroundf(p.x - v.x) - cx - 1,
-		             (int)(lroundf(p.y - v.y - cy/256.0f) - 1),
+		             (int)(lroundf(p.x-v.x-cam.x/256.0f) - 1),
+		             (int)(lroundf(p.y-v.y-cam.y/256.0f) - 1),
 		             3,3,
 		             (0 <= d && d < 2) ? _colours[d] : 0);
 		fb_fill_rect(&cn_screen,
-		             (int)lroundf(p.x) - cx - 1,
-		             (int)(lroundf(p.y - cy/256.0f) - 1),
+		             (int)(lroundf(p.x - cam.x/256.0f) - 1),
+		             (int)(lroundf(p.y - cam.y/256.0f) - 1),
 		             3,3,
 		             (0 <= d && d < 2) ? _colours[d] : 0);
 		fb_fill_rect(&cn_screen,
-		             (int)lroundf(p.x + v.x) - cx,
-		             (int)(lroundf(p.y + v.y - cy/256.0f)),
+		             (int)(lroundf(p.x + v.x - cam.x/256.0f)),
+		             (int)(lroundf(p.y + v.y - cam.y/256.0f)),
 		             3,3,
 		             19);
 		fb_pixel(&cn_screen,
-		         (int)lroundf(p.x + 2*v.x) - cx + 1,
-		         (int)(lroundf(p.y + 2*v.y - cy/256.0f)),
+		         (int)(lroundf(p.x + 2*v.x - cam.x/256.0f) + 1),
+		         (int)(lroundf(p.y + 2*v.y - cam.y/256.0f)),
 		         0);
+	}
+}
+
+static void
+force_player_into_screen(void)
+{
+	int ldx = player.dir > 0 ? -(4<<8) : 23<<8;
+	int rdx = player.dir > 0 ? 23<<8 : 4<<8;
+	if (player.pos.x < cam.x + ldx)
+	{
+		player.pos.x = cam.x + ldx;
+		if (player.vel.x < 0) { player.vel.x = 0; }
+	}
+	if (player.pos.x > cam.x + (240<<8) - rdx)
+	{
+		player.pos.x = cam.x + (240<<8) - rdx;
+		if (player.vel.x > 0) { player.vel.x = 0; }
+	}
+}
+
+static void
+adjust_cam(void)
+{
+	static int const _cdist = 4;
+	static int const _ytrack = 3<<7;
+	if (screen_locked)
+	{
+		rcam.x += ((rcam.x>>8 < screen_lock.x>>8)<<8)
+			- ((rcam.x>>8 > screen_lock.x>>8)<<8);
+		rcam.y += ((rcam.y>>8 < screen_lock.y>>8)<<8)
+			- ((rcam.y>>8 > screen_lock.y>>8)<<8);
+		return;
+	}
+	if (((player.pos.x - rcam.x) >> 8) > 120 + _cdist)
+	{
+		rcam.x = player.pos.x - ((120 + _cdist)<<8);
+	}
+	if (((player.pos.x - rcam.x) >> 8) < 120 - _cdist)
+	{
+		rcam.x = player.pos.x - ((120 - _cdist)<<8);
+	}
+	if (player.state != 2)
+	{
+		cyt = player.pos.y - (54<<8);
+	}
+	if (player.vel.y > 0 && ((player.pos.y - rcam.y)>>8) > 96)
+	{
+		rcam.y = player.pos.y - (96 << 8);
+	}
+	if (abs(rcam.y-cyt) < _ytrack)
+	{
+		rcam.y = cyt;
+	}
+	else
+	{
+		rcam.y += _ytrack * (!!(rcam.y < cyt) - !!(rcam.y > cyt));
 	}
 }
 
 static void
 main_update(void)
 {
-	static int const _cdist = 4;
-	hp_flock.target.x = player.x
+	unsigned int i;
+	hp_flock.target.x = player.pos.x
 		+ (player.dir > 0 ? -(16<<8) : 16<<8);
 	hp_flock.target.x /= 256.0f;
-	hp_flock.target.y = player.y - (16<<8);
+	hp_flock.target.y = player.pos.y - (16<<8);
 	hp_flock.target.y /= 256.0f;
 	/* physics frames */
 	while (cn_need_physics())
@@ -156,54 +215,40 @@ main_update(void)
 			_paused = !_paused;
 		}
 		if (_paused) { continue; }
-		--shake_time;
-		if (shake_time < 0) { shake_time = 0; }
-		--frozen;
-		if (frozen < 0) { frozen = 0; }
+		if (--shake_time < 0) { shake_time = 0; }
+		if (--frozen < 0) { frozen = 0; }
 		if (!frozen)
 		{
-			update_player(&player);
+			screen_locked = 0;
+			for (i = 0; i < num_enemies; ++i)
+			{
+				if (!(enemies[i].update(&(enemies[i]))))
+				{
+					--num_enemies;
+					enemies[i] = enemies[num_enemies];
+					--i;
+				}
+			}
+			player.update(&player);
+			if (screen_locked)
+			{
+				force_player_into_screen();
+			}
 			update_flock(&hp_flock);
 			if (!player.hp)
 			{
 				reset_level();
-				rcx = cx;
-				rcy = cy;
+				rcam = cam;
 				init_flock();
 			}
 		}
 		pressed = 0;
 		released = 0;
-		if ((player.x >> 8) - rcx > 120 + _cdist)
-		{
-			rcx = (player.x >> 8) - (120 + _cdist);
-		}
-		if ((player.x >>8) - rcx < 120 - _cdist)
-		{
-			rcx = (player.x >> 8) - (120 - _cdist);
-		}
-		if (player.state != 2)
-		{
-			cyt = player.y - (54<<8);
-		}
-		if (player.vy > 0 && ((player.y - rcy)>>8) > 96)
-		{
-			rcy = player.y - (96 << 8);
-		}
-		static int const _ytrack = 3<<7;
-		if (abs(rcy-cyt) < _ytrack)
-		{
-			rcy = cyt;
-		}
-		else
-		{
-			rcy += _ytrack
-				* (!!(rcy < cyt) - !!(rcy > cyt));
-		}
-		clamp_cam(&rcx, &rcy);
+		adjust_cam();
+		clamp_cam(&rcam.x, &rcam.y);
 	}
 	/* actual frames */
-	while (rcx > ncx)
+	while (rcam.x > (ncx<<8))
 	{
 		load_column();
 		ncx += 16;
@@ -213,18 +258,25 @@ main_update(void)
 static void
 main_draw(void)
 {
-	int i;
+	unsigned int i;
 	int t;
 	fb_spr(&cn_screen, skybox, 0, 32, 32, -8, -48, 0);
-	cx = rcx + (shake_time
-	            ? _shakex[(shake_time-1) % _shakes]
-	            : 0);
-	cy = rcy + ((shake_time
-	             ? _shakey[(shake_time-1) % _shakes]
-	             : 0) << 8);
-	clamp_cam(&cx, &cy);
-	map(cx, cy>>8);
-	draw_player(&player);
+	cam.x = rcam.x + ((shake_time
+	                   ? shake_size
+	                   * _shakex[(shake_time-1) % _shakes]
+	                   : 0) << 8);
+	cam.y = rcam.y + ((shake_time
+	                   ? shake_size
+	                   * _shakey[(shake_time-1) % _shakes]
+	                   : 0) << 8);
+	clamp_cam(&(cam.x), &(cam.y));
+	map(cam.x>>8, cam.y>>8);
+	for (i = 0; i < num_enemies; ++i)
+	{
+		enemies[i].draw(&(enemies[i]));
+	}
+	player.draw(&player);
+
 	t = player.hp - 1;
 	i = 0;
 	while (t > 0 && i < 16)
@@ -233,9 +285,9 @@ main_draw(void)
 		if (i >= hp_flock.num_boids)
 		{
 			hp_flock.boids[i].pos.x
-				= player.x / 256.0f;
+				= player.pos.x / 256.0f;
 			hp_flock.boids[i].pos.y
-				= player.y / 256.0f;
+				= player.pos.y / 256.0f;
 			hp_flock.boids[i].vel.x
 				= cosf(i/128.0f * M_PI);
 			hp_flock.boids[i].vel.y
@@ -246,11 +298,6 @@ main_draw(void)
 	}
 	hp_flock.num_boids = i;
 	draw_flock();
-	if (frozen)
-	{
-		fb_spr(&cn_screen, ui, 3, 1, 1,
-		       (hx>>8) - cx, (hy - cy) >> 8, 0);
-	}
 #ifdef DEBUG
 	{
 		static char buf[16];
@@ -314,7 +361,7 @@ step(void)
 	}
 	fb_show(&cn_screen);
 #ifdef __EMSCRIPTEN__
-	EM_ASM({fps_counter.innerText = $0;}, cn_get_fps());
+	EM_ASM({Module['fps_counter'].innerText = $0;}, cn_get_fps());
 #endif
 }
 
@@ -334,11 +381,10 @@ main(void)
 	logo = load_spritesheet("logo.png");
 	ui = load_spritesheet("ui.png");
 	load_level(level);
-	rcy = cy;
-	rcx = cx;
+	rcam = cam;
 	ncx = 0;
 	init_flock();
-	cyt = cy;
+	cyt = cam.y;
 
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(step, 0, 1);

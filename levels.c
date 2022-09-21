@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "common.h"
 #include "console.h"
+#include "eggboss.h"
 #include "framebuffer.h"
 #include "graphics.h"
 #include "levels.h"
@@ -24,6 +25,7 @@ static unsigned char const _flags00[] = {
 
 static unsigned char const *_flagp;
 static unsigned char const *_levelp;
+static int _level;
 static int _map_height_octets;
 static unsigned int _map_column;
 /* static unsigned int _collectibles; */
@@ -51,11 +53,16 @@ load_level(int n)
 		return 0;
 	}
 
+	snprintf(buf, 16, "enemies%02d.png", n);
+	enemytex = load_spritesheet(buf);
 	snprintf(buf, 16, "skybox%02d.png", n);
 	skybox = load_spritesheet(buf);
 	snprintf(buf, 16, "tileset%02d.png", n);
 	tiles = load_spritesheet(buf);
 
+	num_enemies = 0;
+	_num_collectibles = 0;
+	_level = n;
 	_levelp = _levels[n];
 	_flagp = _flags[n];
 	_map_height_octets = (int)(*(_levelp++));
@@ -74,6 +81,18 @@ reset_level(void)
 	init_player(&player,
 	            (_player_base_x * 16 + 8)<<8,
 	            (_player_base_y * 16 + 8)<<8);
+	num_enemies = 0;
+	screen_locked = 0;
+}
+
+static void _spawn(struct Entity b)
+{
+	if (num_enemies > sizeof(enemies)/sizeof(enemies[0]))
+	{
+		return;
+	}
+	enemies[num_enemies] = b;
+	++num_enemies;
 }
 
 void
@@ -82,6 +101,8 @@ load_column(void)
 	int i;
 	unsigned int m = 0;
 	int x;
+	int sx;
+	int sy;
 	if (_map_column >= _map_length) { return; }
 	for (i = 0; i < _map_height_octets; ++i)
 	{
@@ -101,6 +122,17 @@ load_column(void)
 			_player_base_x = _map_column;
 			_player_base_y = i;
 			break;
+		case 65:
+			sx = ((_map_column << 4) + 8)<<8;
+			sy = ((i << 4) + 8)<<8;
+			switch (_level)
+			{
+			case 0:
+				_spawn(spawn_eggb(sx, sy));
+				break;
+			default:
+				break;
+			}
 		default:
 			break;
 		}
@@ -174,6 +206,6 @@ clamp(int mn, int x, int mx)
 void
 clamp_cam(int *cx, int *cy)
 {
-	*cx = clamp(0, *cx, _map_length * 16 - 240);
+	*cx = clamp(0, *cx, (_map_length * 16 - 240)<<8);
 	*cy = clamp(0, *cy, (COL_SIZE * 16 - 160) << 8);
 }

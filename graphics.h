@@ -5,6 +5,5 @@
 #else
 #include <SDL.h>
 #endif
-
 SDL_Texture * load_spritesheet(char const *);
 #endif

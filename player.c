@@ -9,13 +9,31 @@
 
 struct Entity player;
 
+static int max_iframes = 64;
+static int _update_player(struct Entity *);
+static void _draw_player(struct Entity *);
+static void _hurt_player(struct Entity *, int);
+
+static void
+_hitspark(struct Entity *p, int x, int y)
+{
+	if (!p) { return; }
+	p->hpos.x = x;
+	p->hpos.y = y;
+	p->hit = 1;
+}
+
 void
 init_player(struct Entity * p, int x, int y)
 {
-	p->x = x;
-	p->y = y;
-	p->vx = 0;
-	p->vy = 0;
+	if (!p) { return; }
+	p->pos.x = x;
+	p->pos.y = y;
+	p->vel.x = 0;
+	p->vel.y = 0;
+	p->hpos.x = 0;
+	p->hpos.y = 0;
+	p->hit = 0;
 	p->dir = 1;
 	p->frame = 0;
 	p->frame_hold = 6;
@@ -23,28 +41,40 @@ init_player(struct Entity * p, int x, int y)
 	p->turnback_time = 0;
 	p->iframes = 0;
 	p->hp = 7;
-	cx = (player.x >> 8) - 120;
-	cy = player.y - (48<<8);
+	p->update = _update_player;
+	p->draw = _draw_player;
+	p->hurt = _hurt_player;
+	p->hb1.pos.x = 16<<8;
+	p->hb1.pos.y = 2<<8;
+	p->hb1.radius = 5<<8;
+	p->hb2.pos.x = 2<<8;
+	p->hb2.pos.y = 6<<8;
+	p->hb2.radius = 6<<8;
+	p->has_two_spheres = 1;
+	cam.x = p->pos.x - (120<<8);
+	cam.y = p->pos.y - (48<<8);
 }
 
 static int
-_handle_map(int x, int y)
+_handle_map(struct Entity *p, int x, int y)
 {
 	int t = flags(tile_at(x,y));
-	if (t != -1 && t&4) { hx = x; hy = y; }
-	if (t != -1 && t&8) { collect(x, y); }
+	if (p)
+	{
+		if (t != -1 && t&4) { _hitspark(p, x, y); }
+		if (t != -1 && t&8) { collect(x, y); }
+	}
 	return t;
 }
 
-void
-update_player(struct Entity * p)
+static int
+_update_player(struct Entity * p)
 {
 	static int const accel = 3<<4;
 	static int const vxmax = 3<<8;
 	static int const vymax = 8<<8;
 	static int const grav = 58;
 	static int const vy0 = 1248;
-	static int const max_iframes = 60;
 	static int const no_ctrl_time = 20;
 	static int jbuf = 0;
 	static int coyote = 0;
@@ -59,55 +89,56 @@ update_player(struct Entity * p)
 	if (pressed & CN_BTN_A) { jbuf = 4; }
 	if (--jbuf < 0) { jbuf = 0; }
 	if (--coyote < 0) { coyote = 0; }
+	if (--(p->hit) < 0) { p->hit = 0; }
 	if (p->iframes > max_iframes - no_ctrl_time
-	    || p->y > ((32 * 16)<<8))
+	    || p->pos.y > ((32 * 16)<<8))
 	{
 		dx = jbuf = 0;
 	}
 	if (--(p->iframes) < 0) { p->iframes = 0; }
 	if (jbuf && coyote)
 	{
-		p->vy = -vy0;
+		p->vel.y = -vy0;
 		p->turnback_time = 0;
 		p->frame = 2;
 		jbuf = coyote = 0;
 	}
-	if ((released & CN_BTN_A) && p->vy < 0)
+	if ((released & CN_BTN_A) && p->vel.y < 0)
 	{
-		p->vy /= 2;
+		p->vel.y /= 2;
 	}
-	p->vy += grav;
-	if (p->vy > vymax)
+	p->vel.y += grav;
+	if (p->vel.y > vymax)
 	{
-		p->vy = vymax;
+		p->vel.y = vymax;
 	}
-	p->y += p->vy;
+	p->pos.y += p->vel.y;
 	/* check vertical map-collisions */
-	q = p->vy <= 0 ? 0 : (8<<8);
+	q = p->vel.y <= 0 ? 0 : (8<<8);
 	f = 0;
-	f |= _handle_map(p->x, p->y + q);
+	f |= _handle_map(p, p->pos.x, p->pos.y + q);
 	s = p->dir < 0 ? -(11<<8) : (10<<8);
-	f |= _handle_map(p->x + s, p->y + q);
+	f |= _handle_map(p, p->pos.x + s, p->pos.y + q);
 	s = p->dir < 0 ? -(20<<8) : (19<<8);
-	f |= _handle_map(p->x + s, p->y + q);
+	f |= _handle_map(p, p->pos.x + s, p->pos.y + q);
 	if (f != -1) { hurt |= f&4; }
 	/* you can always land on solid (1),
 	 * while semisolid (2) requires having previously been
 	 * not within it
 	 * */
-	if (f&1 || (f&2 && p->vy > 0
-	            && ((p->y - p->vy + (8<<8))>>12
-	                < ((p->y + (8<<8))>>12))))
+	if (f&1 || (f&2 && p->vel.y > 0
+	            && ((p->pos.y - p->vel.y + (8<<8))>>12
+	                < ((p->pos.y + (8<<8))>>12))))
 	{
-		p->y  = (p->y + q)&~0xfff;
-		p->y -= p->vy <= 0 ? 1 - (17<<8) : 1;
-		p->y -= q;
-		if (p->vy > 0)
+		p->pos.y  = (p->pos.y + q)&~0xfff;
+		p->pos.y -= p->vel.y <= 0 ? 1 - (17<<8) : 1;
+		p->pos.y -= q;
+		if (p->vel.y > 0)
 		{
 			coyote = 6;
 			p->state = 1;
 		}
-		p->vy = 0;
+		p->vel.y = 0;
 	}
 	/* if grounded, state is running (1), might override to idle */
 
@@ -125,51 +156,51 @@ update_player(struct Entity * p)
 	}
 	--(p->turnback_time);
 	if (p->turnback_time < 0) { p->turnback_time = 0; }
-	p->vx += accel * dx / (p->state == 2 ? 2 : 1);
-	if (!dx) { p->vx *= 9; p->vx /= 10; }
-	if (abs(p->vx) > vxmax)
+	p->vel.x += accel * dx / (p->state == 2 ? 2 : 1);
+	if (!dx) { p->vel.x *= 9; p->vel.x /= 10; }
+	if (abs(p->vel.x) > vxmax)
 	{
-		p->vx = p->vx < 0 ? -vxmax : vxmax;
+		p->vel.x = p->vel.x < 0 ? -vxmax : vxmax;
 	}
-	p->x += p->vx;
+	p->pos.x += p->vel.x;
 	/* check nose-side horizontal map collisions */
 	q = p->dir < 0 ? -(23<<8) : (22<<8);
 	f = 0;
-	f |= _handle_map(p->x + q, p->y);
+	f |= _handle_map(p, p->pos.x + q, p->pos.y);
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
-		p->x  = (p->x + q)&~0xfff;
-		p->x -= p->dir < 0 ? 1 - (17<<8) : 1;
-		p->x -= q;
-		p->vx = 0;
+		p->pos.x  = (p->pos.x + q)&~0xfff;
+		p->pos.x -= p->dir < 0 ? 1 - (17<<8) : 1;
+		p->pos.x -= q;
+		p->vel.x = 0;
 	}
 	/* check interior horizontal map collisions */
 	q = p->dir < 0 ? -(9<<8) : (9<<8);
 	f = 0;
-	f |= _handle_map(p->x + q, p->y);
-	f |= _handle_map(p->x + q, p->y + (7<<8));
+	f |= _handle_map(p, p->pos.x + q, p->pos.y);
+	f |= _handle_map(p, p->pos.x + q, p->pos.y + (7<<8));
 	if (f != -1) { hurt |= f&4; }
 	if (f&1)
 	{
-		p->x  = (p->x + q)&~0xfff;
-		p->x -= p->dir < 0 ? 1 - (17<<8) : 1;
-		p->x -= q;
-		p->vx = 0;
+		p->pos.x  = (p->pos.x + q)&~0xfff;
+		p->pos.x -= p->dir < 0 ? 1 - (17<<8) : 1;
+		p->pos.x -= q;
+		p->vel.x = 0;
 	}
 	/* check butt-side horizontal map collisions */
 	q = p->dir < 0 ? (3<<8) : -(4<<8);
 	f = 0;
-	f |= _handle_map(p->x + q, p->y);
-	f |= _handle_map(p->x + q, p->y + (7<<8));
+	f |= _handle_map(p, p->pos.x + q, p->pos.y);
+	f |= _handle_map(p, p->pos.x + q, p->pos.y + (7<<8));
 	/* take another bit to know direction */
 	if (f != -1) { hurt |= (f&4)>>1; }
 	if (f&1)
 	{
-		p->x  = (p->x + q)&~0xfff;
-		p->x += p->dir < 0 ? -1 : (16<<8);
-		p->x -= q;
-		p->vx = 0;
+		p->pos.x  = (p->pos.x + q)&~0xfff;
+		p->pos.x += p->dir < 0 ? -1 : (16<<8);
+		p->pos.x -= q;
+		p->vel.x = 0;
 	}
 	if (p->state != 2 && !--p->frame_hold)
 	{
@@ -182,40 +213,58 @@ update_player(struct Entity * p)
 	}
 	if (hurt && !p->iframes)
 	{
-		--(p->hp);
-		p->iframes = max_iframes;
-		p->vx = (!!(hurt&4) - !!(hurt&2)) * (-p->dir) * (2<<8);
-		p->vy = -750;
+		_hurt_player(p, !!(hurt&4) - !!(hurt&2));
 		frozen = 6;
+		shake_size = 3;
 		shake_time = 12;
 	}
 	/* if sufficiently slow, stop and set state to idle (0) */
-	if (!dx && (abs(p->vx) < 1<<5))
+	if (!dx && (abs(p->vel.x) < 1<<5))
 	{
-		p->vx = 0;
+		p->vel.x = 0;
 		if (p->state == 1) { p->state = 0; }
 		p->frame = 0;
 	}
 	/* void damage */
-	if (!p->iframes && p->y > (32 * 16)<<8)
+	if (!p->iframes && p->pos.y > (32 * 16)<<8)
 	{
 		--(p->hp);
 		p->iframes = 5 * (10 - p->hp) / 3;
 		if (p->hp < 0) { p->hp = 0; }
 	}
+	return 1;
 }
 
-void
-draw_player(struct Entity * p)
+static void
+_draw_player(struct Entity * p)
 {
 	int const i = p->state == 2 ? 0 : !!(p->turnback_time);
 	int const flip = ((p->dir < 0) ^ i) ? FB_FLIP_HORZ : 0;
 	int const stage = p->state == 2
-		? (abs(p->vy) < 100 ? 1 : (p->vy < 0 ? 0 : 2))
+		? (abs(p->vel.y) < 100 ? 1 : (p->vel.y < 0 ? 0 : 2))
 		: p->frame;
 	int const frame = 32 * 4 * (2 * p->state + i) + 8 * stage;
-	if (p->iframes & 4) { return; }
-	fb_spr(&cn_screen, fox, frame, 7, 3,
-	       (p->x >> 8) - 7 * 4 - cx,
-	       ((p->y - cy) >> 8) - 3 * 4, flip);
+	if (!(p->iframes & 4))
+	{
+		fb_spr(&cn_screen, fox, frame, 7, 3,
+		       ((p->pos.x - cam.x) >> 8) - 7 * 4,
+		       ((p->pos.y - cam.y) >> 8) - 3 * 4, flip);
+	}
+	if (p->hit)
+	{
+		fb_spr(&cn_screen, ui, 3, 1, 1,
+		       ((p->hpos.x - cam.x) >> 8) - 4,
+		       ((p->hpos.y - cam.y) >> 8) - 4, 0);
+	}
+}
+
+static void
+_hurt_player(struct Entity *p, int d)
+{
+	if (!p) { return; }
+	if (p->iframes) { return; }
+	--(p->hp);
+	p->iframes = max_iframes;
+	p->vel.x = d * (-p->dir) * (2<<8);
+	p->vel.y = -750;
 }

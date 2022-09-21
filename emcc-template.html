@@ -19,8 +19,10 @@ canvas.emscripten{border:0px none;background-color:#000;}
 </div>
 <div class="fps">FPS:&nbsp;<span id="fps"></span></div>
 <script type='text/javascript'>
-var Module={canvas:(function(){return document.getElementById('canvas');})()};
-var fps_counter = document.getElementById('fps');
+var Module={
+    canvas:(function(){return document.getElementById('canvas');})(),
+    fps_counter:(function(){return document.getElementById('fps');})()
+};
 </script>
 {{{ SCRIPT }}}
 </body>

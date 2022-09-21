@@ -86,7 +86,7 @@ _speed_limit(struct B2D_Flock *f, struct B2D_Boid *x)
 }
 
 static void
-move_boid(struct B2D_Flock *f, int b)
+move_boid(struct B2D_Flock *f, unsigned int b)
 {
 	struct B2D_Boid *x;
 	struct B2D_V2 t;
@@ -99,7 +99,7 @@ move_boid(struct B2D_Flock *f, int b)
 	int buncollide = 0;
 	float s;
 	float limit;
-	int i;
+	unsigned int i;
 	if (!f) { return; }
 	x = &(f->boids[b]);
 	if (!x) { return; }
@@ -180,7 +180,7 @@ update_flock(struct B2D_Flock *f)
 	/* specifically do not work on a copy
 	 * so that things will separate if they attach
 	 */
-	int i;
+	unsigned int i;
 	if (!f) { return; }
 	for (i = 0; i < f->num_boids; ++i)
 	{

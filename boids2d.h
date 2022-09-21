@@ -27,7 +27,7 @@ struct B2D_Flock
 	float cohere_strength;
 	float uncollide_awareness;
 	float uncollide_strength;
-	int num_boids;
+	unsigned int num_boids;
 };
 
 void init_flock_defaults(struct B2D_Flock *);

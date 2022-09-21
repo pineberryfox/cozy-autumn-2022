@@ -5,16 +5,21 @@
 #else
 #include <SDL.h>
 #endif
+#include "entity.h"
 /* images */
+extern SDL_Texture *enemytex;
 extern SDL_Texture *fox;
+extern SDL_Texture *ui;
 /* camera / game updates */
-extern int cx;
-extern int cy;
+extern struct V2I cam;
+extern struct V2I screen_lock;
+extern int screen_locked;
+extern int shake_size;
 extern int shake_time;
 extern int frozen;
-/* hitspark */
-extern int hx;
-extern int hy;
+/* entities */
+extern struct Entity enemies[16];
+extern unsigned int num_enemies;
 /* button state */
 extern int pressed;
 extern int released;
