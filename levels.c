@@ -65,6 +65,7 @@ load_level(int n)
 
 	num_enemies = 0;
 	_num_collectibles = _saved_collectibles = 0;
+	_collectibles = 0;
 	_level = n;
 	_levelp = _levels[n];
 	_flagp = _flags[n];

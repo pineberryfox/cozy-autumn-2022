@@ -367,9 +367,9 @@ step(void)
 		/* title screen */
 		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
 		{
-			pressed = released = _level = 0;
-			load_level(_level);
-			++game_state;
+			pressed = released = 0;
+			_level = -1;
+			game_state = 3;
 		}
 		fb_fill(&cn_screen, 19);
 		fb_text(&cn_screen, "PRESS START", 76, 104, 0);
@@ -381,13 +381,16 @@ step(void)
 	case 3:
 		++_level;
 		game_state += load_level(_level) ? -1 : 1;
+		rcam = cam;
+		ncx = 0;
+		init_flock();
+		cyt = cam.y;
 		break;
 	case 4:
 		/* end screen */
 		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
 		{
-			pressed = released = _level = 0;
-			load_level(_level);
+			pressed = released = 0;
 			game_state = 1;
 		}
 		fb_fill(&cn_screen, 19);
@@ -415,16 +418,10 @@ main(void)
 	cn_init("Cozy Autumn 2022");
 	cn_quit_hook = cleanup;
 	fb = &cn_screen;
-	_level = 0;
 
 	fox = load_spritesheet("fox.png");
 	logo = load_spritesheet("logo.png");
 	ui = load_spritesheet("ui.png");
-	load_level(_level);
-	rcam = cam;
-	ncx = 0;
-	init_flock();
-	cyt = cam.y;
 
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(step, 0, 1);
