@@ -7,12 +7,12 @@ _hitspark(struct Entity *p, int x, int y)
 	if (!p) { return; }
 	p->hpos.x = x;
 	p->hpos.y = y;
-	p->hit = 1;
+	if (!p->iframes) { p->hit = 7; }
 }
 
 static void
 _hit_on_circ(struct Entity * p, struct V2I pc, unsigned int pr,
-             struct V2I c, void(*hurt)(struct Entity*, int))
+             struct V2I c)
 {
 	int dist;
 	long long t;
@@ -30,7 +30,7 @@ _hit_on_circ(struct Entity * p, struct V2I pc, unsigned int pr,
 	if (dist <= r2)
 	{
 		_hitspark(p, c.x, c.y);
-		hurt(p, (c.x >= pc.x) - (c.x < pc.x));
+		p->hurt(p, (c.x >= pc.x) - (c.x < pc.x));
 		return;
 	}
 	/* if not, then p's boundary on the pc-c line is a hit */
@@ -40,7 +40,7 @@ _hit_on_circ(struct Entity * p, struct V2I pc, unsigned int pr,
 	c.x = pc.x + (int)lroundf(pr * cosf(theta));
 	c.y = pc.y + (int)lroundf(pr * sinf(theta));
 	_hitspark(p, c.x, c.y);
-	hurt(p, (c.x >= pc.x) - (c.x < pc.x));
+	p->hurt(p, (c.x >= pc.x) - (c.x < pc.x));
 }
 
 static int
@@ -60,9 +60,11 @@ _try_hit(struct Entity *p, struct V2I c, unsigned int r, int damaging,
 	pr = hb->radius;
 	r2 = (int)(((long long)(pr+r) * (long long)(pr+r))>>8);
 	t = (long long)(p->pos.x + poffset.x - c.x);
+	if (t > pr + r) { return 0; }
 	t *= t;
 	dist = (int)(t >> 8);
 	t = (long long)(p->pos.y + poffset.y - c.y);
+	if (t > pr + r) { return 0; }
 	t *= t;
 	dist += (int)(t >> 8);
 	if (dist <= (long long)(r2))
@@ -71,7 +73,7 @@ _try_hit(struct Entity *p, struct V2I c, unsigned int r, int damaging,
 		{
 			poffset.x += p->pos.x;
 			poffset.y += p->pos.y;
-			_hit_on_circ(p, poffset, pr, c, p->hurt);
+			_hit_on_circ(p, poffset, pr, c);
 		}
 		return 1;
 	}

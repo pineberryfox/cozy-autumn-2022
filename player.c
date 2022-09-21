@@ -73,7 +73,6 @@ _update_player(struct Entity * p)
 	static int const accel = 3<<4;
 	static int const vxmax = 3<<8;
 	static int const vymax = 8<<8;
-	static int const grav = 58;
 	static int const vy0 = 1248;
 	static int const no_ctrl_time = 20;
 	static int jbuf = 0;
@@ -229,7 +228,7 @@ _update_player(struct Entity * p)
 	if (!p->iframes && p->pos.y > (32 * 16)<<8)
 	{
 		--(p->hp);
-		p->iframes = 5 * (10 - p->hp) / 3;
+		p->iframes = 2;
 		if (p->hp < 0) { p->hp = 0; }
 	}
 	return 1;

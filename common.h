@@ -6,6 +6,7 @@
 #include <SDL.h>
 #endif
 #include "entity.h"
+extern int game_state;
 /* images */
 extern SDL_Texture *enemytex;
 extern SDL_Texture *fox;

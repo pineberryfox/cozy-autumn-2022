@@ -10,7 +10,7 @@ extern SDL_Texture *tiles;
 void clamp_cam(int *cx, int *cy);
 void load_column(void);
 int load_level(int);
-void reset_level(void);
+int reset_level(void);
 /* map: cam_x, cam_y */
 void map(int, int);
 

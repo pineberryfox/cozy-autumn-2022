@@ -25,11 +25,15 @@ static unsigned char const _flags00[] = {
 
 static unsigned char const *_flagp;
 static unsigned char const *_levelp;
+static unsigned char const *_resetp;
 static int _level;
+static int _ncx;
 static int _map_height_octets;
 static unsigned int _map_column;
-/* static unsigned int _collectibles; */
+static unsigned int _ctiles[5];
+static unsigned int _collectibles;
 static unsigned int _num_collectibles;
+static unsigned int _saved_collectibles;
 static unsigned int _player_base_x;
 static unsigned int _player_base_y;
 static unsigned char _map[MAP_SIZE];
@@ -47,7 +51,6 @@ int
 load_level(int n)
 {
 	char buf[16];
-	int i;
 	if ((unsigned int)(n) >= sizeof(_levels)/sizeof(_levels[0]))
 	{
 		return 0;
@@ -61,28 +64,37 @@ load_level(int n)
 	tiles = load_spritesheet(buf);
 
 	num_enemies = 0;
-	_num_collectibles = 0;
+	_num_collectibles = _saved_collectibles = 0;
 	_level = n;
 	_levelp = _levels[n];
 	_flagp = _flags[n];
 	_map_height_octets = (int)(*(_levelp++));
+	_resetp = _levelp;
 	_map_column = 0;
+	_ncx = 0;
+
+	reset_level();
+	return 1;
+}
+
+int
+reset_level(void)
+{
+	int i;
+	int oncx = _map_column = _ncx >> 8;
+	_levelp = _resetp;
+	_num_collectibles = _saved_collectibles;
+	num_enemies = 0;
+	screen_locked = 0;
 
 	for (i = 0; i <= 16; ++i)
 	{
 		load_column();
 	}
-	reset_level();
-	return 1;
-}
-void
-reset_level(void)
-{
 	init_player(&player,
 	            (_player_base_x * 16 + 8)<<8,
 	            (_player_base_y * 16 + 8)<<8);
-	num_enemies = 0;
-	screen_locked = 0;
+	return oncx;
 }
 
 static void _spawn(struct Entity b)
@@ -103,6 +115,8 @@ load_column(void)
 	int x;
 	int sx;
 	int sy;
+	unsigned char const * const held = _levelp;
+	unsigned int const _cc = _num_collectibles;
 	if (_map_column >= _map_length) { return; }
 	for (i = 0; i < _map_height_octets; ++i)
 	{
@@ -114,11 +128,16 @@ load_column(void)
 		x = (m & 1) ? *(_levelp++) : 0;
 		if (flags(x) != -1 && (flags(x) & 8))
 		{
+			x -= !!(_collectibles & (1<<_num_collectibles));
+			_ctiles[_num_collectibles] = _map_column;
 			++_num_collectibles;
 		}
 		switch (x)
 		{
 		case 64:
+			_resetp = held;
+			_saved_collectibles = _cc;
+			_ncx = _map_column << 8;
 			_player_base_x = _map_column;
 			_player_base_y = i;
 			break;
@@ -189,10 +208,20 @@ collect(int x, int y)
 {
 	int const r = y >> 12;
 	int const c = x >> 12;
+	unsigned int i;
 	unsigned int m = COL_SIZE * c + r;
 	if (!(flags(_map[m]) & 8)) { return; }
-	--_num_collectibles;
-	--(_map[COL_SIZE * c + r]);
+	--(_map[m]);
+	m = 1;
+	for (i = 0; i < _num_collectibles; ++i)
+	{
+		if (_ctiles[i] == (unsigned int)c)
+		{
+			_collectibles |= m;
+			break;
+		}
+		m <<= 1;
+	}
 }
 
 static int

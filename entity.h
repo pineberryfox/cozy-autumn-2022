@@ -1,5 +1,7 @@
 #ifndef ENTITY_H
 #define ENTITY_H
+static int const grav = 58;
+
 struct V2I
 {
 	int x;

@@ -30,6 +30,7 @@ SDL_Texture *enemytex;
 SDL_Texture *fox;
 SDL_Texture *ui;
 int frozen;
+int game_state;
 int screen_locked;
 int pressed;
 int released;
@@ -40,12 +41,12 @@ int shake_time;
 static struct FrameBuffer *fb;
 static struct B2D_Flock hp_flock;
 static SDL_Texture *logo;
-static int level;
+static int _level;
 static int ncx;
 static struct V2I rcam;
 static int cyt;
-static int _gamestate;
 static int _paused;
+static int _should_reset;
 
 static void
 cleanup(void)
@@ -143,7 +144,7 @@ draw_flock(void)
 static void
 force_player_into_screen(void)
 {
-	int ldx = player.dir > 0 ? -(4<<8) : 23<<8;
+	int ldx = player.dir > 0 ? 4<<8 : 23<<8;
 	int rdx = player.dir > 0 ? 23<<8 : 4<<8;
 	if (player.pos.x < cam.x + ldx)
 	{
@@ -219,6 +220,14 @@ main_update(void)
 		if (--frozen < 0) { frozen = 0; }
 		if (!frozen)
 		{
+			if (_should_reset)
+			{
+				_should_reset = 0;
+				ncx = reset_level();
+				clamp_cam(&cam.x, &cam.y);
+				rcam = cam;
+				init_flock();
+			}
 			screen_locked = 0;
 			for (i = 0; i < num_enemies; ++i)
 			{
@@ -237,9 +246,9 @@ main_update(void)
 			update_flock(&hp_flock);
 			if (!player.hp)
 			{
-				reset_level();
-				rcam = cam;
-				init_flock();
+				frozen = 60;
+				player.iframes = 0;
+				_should_reset = 1;
 			}
 		}
 		pressed = 0;
@@ -335,7 +344,7 @@ step(void)
 
 	SDL_SetRenderDrawColor(fb->_renderer, 0, 0, 0, 255);
 	fb_fill(fb, -1);
-	switch (_gamestate)
+	switch (game_state)
 	{
 	case 0:
 		while (cn_need_physics()) { --_logo_time; }
@@ -345,18 +354,49 @@ step(void)
 		fb_spr(&cn_screen, logo, 0, 8, 8, 88, 40, 0);
 		fb_text(&cn_screen, "PINEBERRY", 80, 88, -1);
 		fb_text(&cn_screen, "FOX", 104, 96, -1);
-		if (!_logo_time)
+		if (_logo_time <= 0)
 		{
 			SDL_DestroyTexture(logo);
 			logo = NULL;
-			_gamestate = 1;
+			++game_state;
 		}
 		pressed = 0;
 		released = 0;
 		break;
-	default:
+	case 1:
+		/* title screen */
+		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
+		{
+			pressed = released = _level = 0;
+			load_level(_level);
+			++game_state;
+		}
+		fb_fill(&cn_screen, 19);
+		fb_text(&cn_screen, "PRESS START", 76, 104, 0);
+		break;
+	case 2:
 		main_update();
 		main_draw();
+		break;
+	case 3:
+		++_level;
+		game_state += load_level(_level) ? -1 : 1;
+		break;
+	case 4:
+		/* end screen */
+		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
+		{
+			pressed = released = _level = 0;
+			load_level(_level);
+			game_state = 1;
+		}
+		fb_fill(&cn_screen, 19);
+		fb_text(&cn_screen, "THANK YOU", 84, 60, 0);
+		fb_text(&cn_screen, "FOR PLAYING", 76, 68, 0);
+		fb_text(&cn_screen, "THIS DEMO", 84, 76, 0);
+		fb_text(&cn_screen, "ENJOY THE EGGS!", 60, 92, 0);
+		break;
+	default:
 		break;
 	}
 	fb_show(&cn_screen);
@@ -375,12 +415,12 @@ main(void)
 	cn_init("Cozy Autumn 2022");
 	cn_quit_hook = cleanup;
 	fb = &cn_screen;
-	level = 0;
+	_level = 0;
 
 	fox = load_spritesheet("fox.png");
 	logo = load_spritesheet("logo.png");
 	ui = load_spritesheet("ui.png");
-	load_level(level);
+	load_level(_level);
 	rcam = cam;
 	ncx = 0;
 	init_flock();
