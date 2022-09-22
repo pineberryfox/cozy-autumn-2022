@@ -5,6 +5,16 @@
 
 extern int bgm_paused;
 
+enum SFX
+{
+	SFX_RUMBLE = 0,
+	SFX_JUMP = 1,
+	SFX_COLLECT = 2,
+	SFX_HURT = 3,
+	SFX_SQUEAK = 4,
+	SFX_SELECT = 5,
+};
+
 struct sfx_list {
 	struct sfx_list * next;
 	struct pocketmod_context * data;
@@ -45,14 +55,16 @@ void mix(struct SoundManager *, float * restrict, float * restrict *,
  * struct SoundManager *: the sound system
  *                char *: MOD file data
  *                size_t: MOD file size
- *                   int: sample rate
+ *                   int: the desired sfx
  */
 void enqueue_sfx(struct SoundManager *, char *, size_t, int);
+/* sfx: enqueue_sfx with a default parameters */
+#define sfx(n) (enqueue_sfx(&sound_manager, sfx_data, sfx_size, n))
 
 /* jump_to_pattern
- * struct SoundManager *: the sound system
- *                   int: the pattern
+ * struct pocketmod_context *: the module
+ *                        int: the pattern
  */
-void jump_to_pattern(struct SoundManager *, int);
+void jump_to_pattern(struct pocketmod_context *, int);
 
 #endif

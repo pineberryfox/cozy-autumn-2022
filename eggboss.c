@@ -70,7 +70,8 @@ _update_eggb(struct Entity * e)
 			break;
 		}
 		force_bgm_pause = 1;
-		jump_to_pattern(&sound_manager, 5);
+		sfx(SFX_RUMBLE);
+		jump_to_pattern(sound_manager.bgm, 5);
 		++(e->state);
 		shake_size = 1;
 		shake_time += 12;
@@ -79,6 +80,7 @@ _update_eggb(struct Entity * e)
 	case 1:
 		force_bgm_pause = 1;
 		if (_hatch_cooldown) { break; }
+		sfx(SFX_RUMBLE);
 		++(e->state);
 		shake_size = 2;
 		shake_time += 12;
@@ -87,6 +89,7 @@ _update_eggb(struct Entity * e)
 	case 2:
 		force_bgm_pause = 1;
 		if (_hatch_cooldown) { break; }
+		sfx(SFX_RUMBLE);
 		++(e->state);
 		shake_size = 3;
 		shake_time += 60;
@@ -171,6 +174,7 @@ _hurt_eggb(struct Entity *e, int _d)
 	(void)(_d) /* unused */;
 	if (!e) { return; }
 	if (e->iframes) { return; }
+	sfx(SFX_HURT);
 	--(e->hp);
 	e->iframes = 64;
 }

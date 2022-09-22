@@ -9,7 +9,10 @@
 #include "entity.h"
 extern int game_state;
 extern char * bgm_data;
+extern char * sfx_data;
+extern size_t sfx_size;
 /* audio */
+extern SDL_AudioDeviceID audio_device;
 extern SDL_AudioSpec audio_format;
 extern struct SoundManager sound_manager;
 extern int force_bgm_pause;

@@ -5,6 +5,7 @@
 #include <pocketmod.h>
 
 #include "audio.h"
+#include "common.h"
 
 int bgm_paused;
 
@@ -59,17 +60,15 @@ mix(struct SoundManager * manager,
 	if (bgm_paused)
 	{
 		if (buffer) { memset((void*)(buffer), 0, bytes); }
-		return;
 	}
 	if (!scratch || !buffer || !manager || !manager->bgm) {return;}
 	if (!*scratch) {*scratch = malloc(bytes);}
 	if (!*scratch) {return;}
-	while (i < bytes)
+	while (i < bytes && !bgm_paused)
 	{
 		i += pocketmod_render(manager->bgm,
 		                      (char*)(buffer) + i, bytes - i);
 	}
-	return;
 	struct sfx_list * p = NULL;
 	struct sfx_list * s = manager->sfx;
 	while (s)
@@ -106,7 +105,7 @@ mix(struct SoundManager * manager,
 
 void
 enqueue_sfx(struct SoundManager * manager,
-            char * data, size_t size, int rate)
+            char * data, size_t size, int n)
 {
 	struct sfx_list * s = malloc(sizeof(struct sfx_list));
 	if (!s) {return;}
@@ -116,25 +115,28 @@ enqueue_sfx(struct SoundManager * manager,
 		free(s);
 		return;
 	}
-	if (!pocketmod_init(s->data, data, size, rate))
+	if (!pocketmod_init(s->data, data, size, audio_format.freq))
 	{
 		free(s);
 		return;
 	}
+	jump_to_pattern(s->data, n);
+	/* acquire a lock to avoid mix invalidating our data */
+	SDL_LockAudioDevice(audio_device);
 	s->next = manager->sfx;
 	manager->sfx = s;
+	SDL_UnlockAudioDevice(audio_device);
 }
 
 /* this function jumps into the private parts of pocketmod! */
 void
-jump_to_pattern(struct SoundManager *manager, int n)
+jump_to_pattern(struct pocketmod_context *ctx, int n)
 {
-	if (!manager) { return; }
-	if (!manager->bgm) { return; }
-	if (n >= manager->bgm->num_patterns ) { return; }
-	manager->bgm->pattern = 5;
-	manager->bgm->line = -1;
-	manager->bgm->tick = manager->bgm->ticks_per_line - 1;
-	manager->bgm->loop_count = 0;
+	if (!ctx) { return; }
+	if (n >= ctx->num_patterns ) { return; }
+	ctx->pattern = n;
+	ctx->line = -1;
+	ctx->tick = ctx->ticks_per_line - 1;
+	ctx->loop_count = 0;
 
 }

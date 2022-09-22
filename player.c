@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "audio.h"
 #include "common.h"
 #include "console.h"
 #include "entity.h"
@@ -14,6 +15,8 @@ static int _update_player(struct Entity *);
 static void _draw_player(struct Entity *);
 static void _hurt_player(struct Entity *, int);
 
+static int _voided;
+
 static void
 _hitspark(struct Entity *p, int x, int y)
 {
@@ -27,6 +30,7 @@ void
 init_player(struct Entity * p, int x, int y)
 {
 	if (!p) { return; }
+	_voided = 0;
 	p->pos.x = x;
 	p->pos.y = y;
 	p->vel.x = 0;
@@ -97,6 +101,7 @@ _update_player(struct Entity * p)
 	if (--(p->iframes) < 0) { p->iframes = 0; }
 	if (jbuf && coyote)
 	{
+		sfx(SFX_JUMP);
 		p->vel.y = -vy0;
 		p->turnback_time = 0;
 		p->frame = 2;
@@ -227,6 +232,8 @@ _update_player(struct Entity * p)
 	/* void damage */
 	if (!p->iframes && p->pos.y > (32 * 16)<<8)
 	{
+		if (!_voided) { sfx(SFX_SQUEAK); }
+		_voided = 1;
 		--(p->hp);
 		p->iframes = 2;
 		if (p->hp < 0) { p->hp = 0; }
@@ -262,6 +269,7 @@ _hurt_player(struct Entity *p, int d)
 {
 	if (!p) { return; }
 	if (p->iframes) { return; }
+	sfx(SFX_SQUEAK);
 	--(p->hp);
 	p->iframes = max_iframes;
 	p->vel.x = d * (-p->dir) * (2<<8);

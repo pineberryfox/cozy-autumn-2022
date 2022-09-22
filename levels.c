@@ -218,6 +218,7 @@ collect(int x, int y)
 	unsigned int i;
 	unsigned int m = COL_SIZE * c + r;
 	if (!(flags(_map[m]) & 8)) { return; }
+	sfx(SFX_COLLECT);
 	--(_map[m]);
 	m = 1;
 	for (i = 0; i < _num_collectibles; ++i)

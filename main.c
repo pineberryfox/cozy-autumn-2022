@@ -27,10 +27,13 @@ static int const _shakey[] = {1, 2, 0, -2, -1, 0};
 /* exported */
 struct SoundManager sound_manager;
 char *bgm_data;
+char *sfx_data;
+size_t sfx_size;
 struct Entity enemies[16];
 struct V2I cam;
 struct V2I screen_lock;
 unsigned int num_enemies;
+SDL_AudioDeviceID audio_device;
 SDL_AudioSpec audio_format;
 SDL_Texture *enemytex;
 SDL_Texture *fox;
@@ -49,8 +52,8 @@ static struct FrameBuffer *fb;
 static struct B2D_Flock hp_flock;
 static struct pocketmod_context * _pmcontext;
 static SDL_Texture *logo;
+static SDL_Texture *title;
 static float * _scratch;
-static SDL_AudioDeviceID _device;
 static int _level;
 static int ncx;
 static struct V2I rcam;
@@ -61,9 +64,11 @@ static int _should_reset;
 static void
 cleanup(void)
 {
-	SDL_PauseAudioDevice(_device, 1);
+	SDL_PauseAudioDevice(audio_device, 1);
 	if (_pmcontext) { free(_pmcontext); _pmcontext = NULL; }
 	if (_scratch) { free(_scratch); _scratch = NULL; }
+	if (bgm_data) { free(bgm_data); bgm_data = NULL; }
+	if (sfx_data) { free(sfx_data); sfx_data = NULL; }
 	if (fox) { SDL_DestroyTexture(fox); fox = NULL; }
 	if (skybox) { SDL_DestroyTexture(skybox); skybox = NULL; }
 	if (tiles) { SDL_DestroyTexture(tiles); tiles = NULL; }
@@ -233,6 +238,7 @@ main_update(void)
 			pressed = 0;
 			released = 0;
 			_paused = !_paused;
+			sfx(SFX_SELECT);
 			bgm_paused = _paused && !force_bgm_pause;
 		}
 		if (_paused) { continue; }
@@ -395,9 +401,10 @@ step(void)
 			pressed = released = 0;
 			_level = -1;
 			game_state = 3;
+			sfx(SFX_SELECT);
 		}
-		fb_fill(&cn_screen, 19);
-		fb_text(&cn_screen, "PRESS START", 76, 104, 0);
+		fb_spr(&cn_screen, title, 0, 30, 20, 0, 0, 0);
+		fb_text(&cn_screen, "PRESS START", 76, 128, 0);
 		break;
 	case 2:
 		main_update();
@@ -464,10 +471,11 @@ main(void)
 	audio_format.samples = 2048;
 	audio_format.callback = _audio_callback;
 	audio_format.userdata = (void*)(&sound_manager);
-	_device = SDL_OpenAudioDevice(NULL, 0,
-	                              &audio_format, &audio_format,
-	                              SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
-	if (!_device)
+	audio_device
+		= SDL_OpenAudioDevice(NULL, 0,
+		                      &audio_format, &audio_format,
+		                      SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+	if (!audio_device)
 	{
 		fprintf(stderr,
 		        "error: SDL_OpenAudioDevice() failed: %s\n",
@@ -475,10 +483,12 @@ main(void)
 		return 1;
 	}
 	bgm_paused = 1;
-	SDL_PauseAudioDevice(_device, 0);
+	SDL_PauseAudioDevice(audio_device, 0);
 
+	sfx_data = init_data("sfx.mod", &sfx_size);
 	fox = load_spritesheet("fox.png");
 	logo = load_spritesheet("logo.png");
+	title = load_spritesheet("title.png");
 	ui = load_spritesheet("ui.png");
 
 #ifdef __EMSCRIPTEN__
