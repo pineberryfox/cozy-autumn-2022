@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 #include "audio.h"
 #include "common.h"
@@ -109,7 +110,7 @@ _update_eggb(struct Entity * e)
 			int dx = player.pos.x - e->pos.x;
 			int dy = player.pos.y - e->pos.y;
 			float theta = atan2f(dy, dx);
-			if (dy < 0) { theta = (theta - M_PI_2) / 2.0f; }
+			if (dy < 0) { theta = (theta - M_PI/2.0f)/2.0f; }
 			int x = (int)(e->pos.x+(12<<8)*cosf(theta));
 			int y = (int)(e->pos.y+(12<<8)*sinf(theta));
 			struct Entity tegg = _spawn_tegg(x,y);

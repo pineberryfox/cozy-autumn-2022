@@ -187,6 +187,7 @@ cn_update(void)
 				cn_buttons |= axis_map(e.caxis.axis,
 				                       e.caxis.value);
 			}
+			break;
 		case SDL_KEYDOWN:
 			switch (e.key.keysym.scancode)
 			{
