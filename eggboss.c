@@ -1,4 +1,5 @@
 #include <string.h>
+#include "audio.h"
 #include "common.h"
 #include "console.h"
 #include "entity.h"
@@ -68,12 +69,15 @@ _update_eggb(struct Entity * e)
 		{
 			break;
 		}
+		force_bgm_pause = 1;
+		jump_to_pattern(&sound_manager, 5);
 		++(e->state);
 		shake_size = 1;
 		shake_time += 12;
 		_hatch_cooldown = 180;
 		break;
 	case 1:
+		force_bgm_pause = 1;
 		if (_hatch_cooldown) { break; }
 		++(e->state);
 		shake_size = 2;
@@ -81,6 +85,7 @@ _update_eggb(struct Entity * e)
 		_hatch_cooldown = 120;
 		break;
 	case 2:
+		force_bgm_pause = 1;
 		if (_hatch_cooldown) { break; }
 		++(e->state);
 		shake_size = 3;
@@ -98,13 +103,20 @@ _update_eggb(struct Entity * e)
 		if (!_hatch_cooldown)
 		{
 			_hatch_cooldown = 60;
-			float theta = atan2f(player.pos.y - e->pos.y,
-			                     player.pos.x - e->pos.x);
+			int dx = player.pos.x - e->pos.x;
+			int dy = player.pos.y - e->pos.y;
+			float theta = atan2f(dy, dx);
+			if (dy < 0) { theta = (theta - M_PI_2) / 2.0f; }
 			int x = (int)(e->pos.x+(12<<8)*cosf(theta));
 			int y = (int)(e->pos.y+(12<<8)*sinf(theta));
 			struct Entity tegg = _spawn_tegg(x,y);
 			tegg.vel.x = (int)((3<<8) * cosf(theta));
 			tegg.vel.y = (int)((3<<8) * sinf(theta));
+			if (dy < 0)
+			{
+				tegg.vel.x *= 4.0f/3.0f;
+				tegg.vel.y *= 11.0f/10.0f;
+			}
 			enemies[num_enemies] = tegg;
 			++num_enemies;
 		}

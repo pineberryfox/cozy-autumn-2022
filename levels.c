@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "audio.h"
 #include "common.h"
 #include "console.h"
 #include "eggboss.h"
@@ -62,6 +63,11 @@ load_level(int n)
 	skybox = load_spritesheet(buf);
 	snprintf(buf, 16, "tileset%02d.png", n);
 	tiles = load_spritesheet(buf);
+	snprintf(buf, 16, "level%02d.mod", n);
+	bgm_paused = 1;
+	if (bgm_data) { free(bgm_data); bgm_data = NULL; }
+	bgm_data = init_context(sound_manager.bgm,buf,audio_format.freq);
+	bgm_paused = 0;
 
 	num_enemies = 0;
 	_num_collectibles = _saved_collectibles = 0;

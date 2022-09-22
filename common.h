@@ -5,8 +5,14 @@
 #else
 #include <SDL.h>
 #endif
+#include "audio.h"
 #include "entity.h"
 extern int game_state;
+extern char * bgm_data;
+/* audio */
+extern SDL_AudioSpec audio_format;
+extern struct SoundManager sound_manager;
+extern int force_bgm_pause;
 /* images */
 extern SDL_Texture *enemytex;
 extern SDL_Texture *fox;

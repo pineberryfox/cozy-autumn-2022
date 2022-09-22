@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #include <unistd.h>
@@ -9,6 +10,8 @@
 #include <emscripten.h>
 #endif
 
+#include <pocketmod.h>
+#include "audio.h"
 #include "boids2d.h"
 #include "common.h"
 #include "console.h"
@@ -22,13 +25,17 @@ static int const _shakey[] = {1, 2, 0, -2, -1, 0};
 #define _shakes (sizeof(_shakex)/sizeof(_shakex[0]))
 
 /* exported */
+struct SoundManager sound_manager;
+char *bgm_data;
 struct Entity enemies[16];
 struct V2I cam;
 struct V2I screen_lock;
 unsigned int num_enemies;
+SDL_AudioSpec audio_format;
 SDL_Texture *enemytex;
 SDL_Texture *fox;
 SDL_Texture *ui;
+int force_bgm_pause;
 int frozen;
 int game_state;
 int screen_locked;
@@ -40,7 +47,10 @@ int shake_time;
 /* nonexported */
 static struct FrameBuffer *fb;
 static struct B2D_Flock hp_flock;
+static struct pocketmod_context * _pmcontext;
 static SDL_Texture *logo;
+static float * _scratch;
+static SDL_AudioDeviceID _device;
 static int _level;
 static int ncx;
 static struct V2I rcam;
@@ -51,9 +61,18 @@ static int _should_reset;
 static void
 cleanup(void)
 {
-	if (fox) { SDL_DestroyTexture(fox); }
-	if (skybox) { SDL_DestroyTexture(skybox); }
-	if (tiles) { SDL_DestroyTexture(tiles); }
+	SDL_PauseAudioDevice(_device, 1);
+	if (_pmcontext) { free(_pmcontext); _pmcontext = NULL; }
+	if (_scratch) { free(_scratch); _scratch = NULL; }
+	if (fox) { SDL_DestroyTexture(fox); fox = NULL; }
+	if (skybox) { SDL_DestroyTexture(skybox); skybox = NULL; }
+	if (tiles) { SDL_DestroyTexture(tiles); tiles = NULL; }
+}
+
+static void
+_audio_callback(void * userdata, unsigned char * buffer, int bytes)
+{
+	mix(userdata, (float*)(buffer), &_scratch, bytes);
 }
 
 #ifdef __APPLE__
@@ -214,6 +233,7 @@ main_update(void)
 			pressed = 0;
 			released = 0;
 			_paused = !_paused;
+			bgm_paused = _paused && !force_bgm_pause;
 		}
 		if (_paused) { continue; }
 		if (--shake_time < 0) { shake_time = 0; }
@@ -229,6 +249,7 @@ main_update(void)
 				init_flock();
 			}
 			screen_locked = 0;
+			force_bgm_pause = 0;
 			for (i = 0; i < num_enemies; ++i)
 			{
 				if (!(enemies[i].update(&(enemies[i]))))
@@ -238,6 +259,7 @@ main_update(void)
 					--i;
 				}
 			}
+			bgm_paused = force_bgm_pause;
 			player.update(&player);
 			if (screen_locked)
 			{
@@ -347,6 +369,7 @@ step(void)
 	switch (game_state)
 	{
 	case 0:
+		bgm_paused = 1;
 		while (cn_need_physics()) { --_logo_time; }
 		SDL_SetRenderDrawColor(fb->_renderer, 0, 47, 88, 255);
 		fb_fill(fb, -1);
@@ -365,6 +388,8 @@ step(void)
 		break;
 	case 1:
 		/* title screen */
+		bgm_paused = 1;
+		while (cn_need_physics());
 		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
 		{
 			pressed = released = 0;
@@ -379,6 +404,8 @@ step(void)
 		main_draw();
 		break;
 	case 3:
+		bgm_paused = 1;
+		while (cn_need_physics());
 		++_level;
 		game_state += load_level(_level) ? -1 : 1;
 		rcam = cam;
@@ -388,6 +415,8 @@ step(void)
 		break;
 	case 4:
 		/* end screen */
+		bgm_paused = 1;
+		while (cn_need_physics());
 		if (pressed & (CN_BTN_A | CN_BTN_B | CN_BTN_START))
 		{
 			pressed = released = 0;
@@ -400,6 +429,7 @@ step(void)
 		fb_text(&cn_screen, "ENJOY THE EGGS!", 60, 92, 0);
 		break;
 	default:
+		bgm_paused = 1;
 		break;
 	}
 	fb_show(&cn_screen);
@@ -418,6 +448,34 @@ main(void)
 	cn_init("Cozy Autumn 2022");
 	cn_quit_hook = cleanup;
 	fb = &cn_screen;
+
+	_pmcontext = malloc(sizeof(struct pocketmod_context));
+	if (!_pmcontext)
+	{
+		fprintf(stderr, "no memory for context\n");
+		return 1;
+	}
+	memset(_pmcontext, 0, sizeof(*_pmcontext));
+	sound_manager.bgm = _pmcontext;
+	sound_manager.sfx = NULL;
+	audio_format.freq = 44100;
+	audio_format.format = AUDIO_F32;
+	audio_format.channels = 2;
+	audio_format.samples = 2048;
+	audio_format.callback = _audio_callback;
+	audio_format.userdata = (void*)(&sound_manager);
+	_device = SDL_OpenAudioDevice(NULL, 0,
+	                              &audio_format, &audio_format,
+	                              SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+	if (!_device)
+	{
+		fprintf(stderr,
+		        "error: SDL_OpenAudioDevice() failed: %s\n",
+		        SDL_GetError());
+		return 1;
+	}
+	bgm_paused = 1;
+	SDL_PauseAudioDevice(_device, 0);
 
 	fox = load_spritesheet("fox.png");
 	logo = load_spritesheet("logo.png");

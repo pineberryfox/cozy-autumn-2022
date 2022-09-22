@@ -3,6 +3,9 @@ CFLAGS+= -std=c99
 CFLAGS+= -I$(.CURDIR)/stb
 CFLAGS+= -DSTBI_ONLY_PNG
 CFLAGS+= -DSTBI_MAX_DIMENSIONS=512
+CFLAGS+= -I$(.CURDIR)/pocketmod
+CFLAGS+= -DPOCKETMOD_MAX_CHANNELS=4
+CFLAGS+= -DPOCKETMOD_MAX_SAMPLES=31
 CFLAGS+= -Wall -Wextra
 .ifndef(OS)
 .OBJDIR : $(.CURDIR)/web
@@ -43,7 +46,7 @@ PATH := $(.CURDIR)/Tools:$(PATH)
 .c.o:
 	$(CC) $(CFLAGS) -o $(.TARGET) -c $(.IMPSRC)
 
-main$(EXE) : main.o boids2d.o console.o eggboss.o entity.o
+main$(EXE) : main.o audio.o boids2d.o console.o eggboss.o entity.o
 main$(EXE) : framebuffer.o graphics.o levels.o lv00.o player.o
 .if $(CC) == emcc
 main$(EXE) : emcc-template.html
@@ -51,6 +54,7 @@ main$(EXE) : emcc-template.html
 main$(EXE) :
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(.TARGET) $(.ALLSRC:M*.o) $(LDLIBS)
 
+audio.o : audio.c audio.h
 boids2d.o : boids2d.c boids2d.h
 console.o : console.c console.h framebuffer.h
 eggboss.o : eggboss.c common.h console.h eggboss.h entity.h
@@ -61,8 +65,8 @@ graphics.o : graphics.c console.h framebuffer.h graphics.h
 levels.o : levels.c common.h console.h eggboss.h entity.h
 levels.o : framebuffer.h graphics.h levels.h player.h
 lv00.o : lv00.c
-main.o : main.c boids2d.h common.h console.h entity.h framebuffer.h
-main.o : graphics.h levels.h player.h
+main.o : main.c audio.h boids2d.h common.h console.h entity.h
+main.o : framebuffer.h graphics.h levels.h player.h
 player.o : player.c common.h console.h entity.h framebuffer.h
 player.o : levels.h player.h
 
