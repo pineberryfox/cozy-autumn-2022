@@ -100,6 +100,7 @@ find_resources(void)
 	chdir(thepath);
 	CFRelease(fpr);
 	CFRelease(url);
+	CFRelease(bundle);
 }
 #endif
 
